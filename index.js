@@ -79,16 +79,21 @@ app.get('/branches/:id/stock', async (req, res) => {
 });
 
 app.post('/stock/adjust', async (req, res) => {
-    const { product_id, branch_id, change_amount, reason } = req.body;
-    try{
-        await pool.query(
-            `UPDATE stock SET quantity = quantity + $1 WHERE product_id=$2 AND branch_id=$3`,
-            [change_amount, product_id, branch_id]
-        );
-        res.json({ message: 'Stock updated' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+  const { product_id, branch_id, change_amount, reason } = req.body;
+  try {
+    await pool.query(
+      `UPDATE stock SET quantity = quantity + $1 WHERE product_id=$2 AND branch_id=$3`,
+      [change_amount, product_id, branch_id]
+    );
+    await pool.query(
+      `INSERT INTO stock_movements (product_id, branch_id, change_amount, reason)
+       VALUES ($1, $2, $3, $4)`,
+      [product_id, branch_id, change_amount, reason]
+    );
+    res.json({ message: 'Stock updated' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.listen(PORT, () =>{
