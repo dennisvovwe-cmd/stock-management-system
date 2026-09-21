@@ -6,7 +6,26 @@ app.use(express.json());
 
 const PORT =3000;
 
-app.post('/products', async (req, res) => {
+function authenticate(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'No token provided' });
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ error: 'Invalid or expired token' });
+    req.user = user;
+    next();
+  });
+}
+
+function requireAccountant(req, res, next) {
+  if (req.user.role !== 'accountant') {
+    return res.status(403).json({ error: 'Accountant access only' });
+  }
+  next();
+}
+
+app.post('/products', authenticate,requireAccountant, async (req, res) => {
     const { name, description, category, unit_type, cost_price, selling_price} = req.body;
     try{
         const result = await pool.query(
@@ -20,7 +39,7 @@ app.post('/products', async (req, res) => {
     }
 });
 
-app.get('/products', async (req, res) => {
+app.get('/products', authenticate, async (req, res) => {
     try{
         const result = await pool.query('SELECT * FROM products');
         res.json(result.rows);
@@ -96,6 +115,46 @@ app.post('/stock/adjust', async (req, res) => {
   }
 });
 
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+
+app.post('/signup', async (req, res) => {
+    const { name, email, password, role, branch_id } = req.body;
+    try {
+        const password_hash = await bcrypt.hash(password, 10);
+        const result = await pool.query(
+            `INSERT INTO users (name, email, password_hash, role, branch_id)
+             VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, role, branch_id`,
+            [name, email, password_hash, role, branch_id]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+}); 
+
+app.post('/login', async (req, res) => {
+    const { email, password } = req.body;
+    try {
+        const result = await pool.query('SELECT * FROM users WHERE email=$1', [email]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Invalid email or password' });
+    }
+    const user = result.rows[0];
+    const match = await bcrypt.compare(password,user.password_hash);
+    if (!match){
+        return res.status(404).json({ error: 'Invalid email or password' });
+}
+const token = jwt.sign(
+    { id: user.id, role: user.role, branch_id: user.branch_id }, 
+    process.env.JWT_SECRET, 
+    { expiresIn: '1h' }
+);
+res.json({ token, role: user.role, name: user.name });
+} catch (err) {
+    res.status(500).json({ error: err.message });
+}
+});
 app.listen(PORT, () =>{
     console.log(`Server running on http://localhost:${PORT}`);
 })
