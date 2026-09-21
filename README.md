@@ -1,1 +1,1 @@
-#Stpck Management System
+# Stock Management System
