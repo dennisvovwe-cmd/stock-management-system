@@ -48,7 +48,7 @@ app.get('/products', authenticate, async (req, res) => {
     }
 });
 
-app.get('/products/:id', async (req, res) =>{
+app.get('/products/:id', authenticate, async (req, res) =>{
     try{
         const result = await  pool.query('SELECT *FROM products WHERE id = $1', [req.params.id]);
         if (result.rows.length === 0) return res.status(404).json({error: 'Product not found'});
@@ -58,7 +58,7 @@ app.get('/products/:id', async (req, res) =>{
     }
 });
 
-app.put('/products/:id', async (req, res) => {
+app.put('/products/:id', authenticate,requireAccountant, async (req, res) => {
     const { name, description, category, unit_type, cost_price, selling_price } = req.body;
     try{
         const result = await pool. query(
@@ -73,7 +73,7 @@ app.put('/products/:id', async (req, res) => {
     }
 });
 
-app.delete('/products/:id', async (req, res) => {
+app.delete('/products/:id', authenticate,requireAccountant, async (req, res) => {
     try{
         const result = await pool.query('DELETE FROM products WHERE id= $1 RETURNING *', [req.params.id]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Product not found' });
@@ -83,7 +83,7 @@ app.delete('/products/:id', async (req, res) => {
     }
 });
 
-app.get('/branches/:id/stock', async (req, res) => {
+app.get('/branches/:id/stock', authenticate, async (req, res) => {
     try{
         const result = await pool.query(
             `SELECT p.id, p.name, s.quantity
@@ -97,7 +97,7 @@ app.get('/branches/:id/stock', async (req, res) => {
     }
 });
 
-app.post('/stock/adjust', async (req, res) => {
+app.post('/stock/adjust', authenticate, async (req, res) => {
   const { product_id, branch_id, change_amount, reason } = req.body;
   try {
     await pool.query(
