@@ -169,6 +169,94 @@ res.json({ token, role: user.role, name: user.name });
     res.status(500).json({ error: err.message });
 }
 });
+
+app.post('/sales', authenticate, async (req, res) => {
+  const { branch_id, customer_name, is_credit, amount_paid, items } = req.body;
+  // items = [{ product_id, quantity, unit_price }, ...]
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const total_amount = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+
+    const saleResult = await client.query(
+      `INSERT INTO sales (branch_id, user_id, customer_name, is_credit, amount_paid, total_amount)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [branch_id, req.user.id, customer_name, is_credit || false, amount_paid || 0, total_amount]
+    );
+    const sale_id = saleResult.rows[0].id;
+
+    for (const item of items) {
+      const subtotal = item.quantity * item.unit_price;
+
+      await client.query(
+        `INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, subtotal)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [sale_id, item.product_id, item.quantity, item.unit_price, subtotal]
+      );
+
+      await client.query(
+        `UPDATE stock SET quantity = quantity - $1 WHERE product_id=$2 AND branch_id=$3`,
+        [item.quantity, item.product_id, branch_id]
+      );
+
+      await client.query(
+        `INSERT INTO stock_movements (product_id, branch_id, change_amount, reason)
+         VALUES ($1, $2, $3, 'sale')`,
+        [item.product_id, branch_id, -item.quantity]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ sale_id, total_amount });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+app.get('/sales', authenticate, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM sales ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/sales/:id', authenticate, async (req, res) => {
+  try {
+    const sale = await pool.query('SELECT * FROM sales WHERE id = $1', [req.params.id]);
+    if (sale.rows.length === 0) return res.status(404).json({ error: 'Sale not found' });
+
+    const items = await pool.query(
+      `SELECT si.*, p.name FROM sale_items si JOIN products p ON si.product_id = p.id WHERE si.sale_id = $1`,
+      [req.params.id]
+    );
+
+    res.json({ ...sale.rows[0], items: items.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/sales/credit/outstanding', authenticate, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, customer_name, branch_id, total_amount, amount_paid, 
+              (total_amount - amount_paid) AS balance_owed, created_at
+       FROM sales
+       WHERE is_credit = true AND amount_paid < total_amount
+       ORDER BY created_at ASC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 app.listen(PORT, () =>{
     console.log(`Server running on http://localhost:${PORT}`);
 })
