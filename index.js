@@ -287,6 +287,25 @@ app.get('/sales/credit/outstanding', authenticate, async (req, res) => {
   }
 });
 
+app.get('/sales/credit/by-customer', authenticate, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT customer_name,
+              COUNT(*) AS number_of_sales,
+              SUM(total_amount) AS total_billed,
+              SUM(amount_paid) AS total_paid,
+              SUM(total_amount - amount_paid) AS total_owed
+       FROM sales
+       WHERE is_credit = true AND amount_paid < total_amount
+       GROUP BY customer_name
+       ORDER BY total_owed DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.put('/sales/:id/payment', authenticate, async (req, res) => {
   const { additional_payment } = req.body;
   try {
@@ -358,6 +377,36 @@ app.get('/reports/stock-valuation', authenticate, requireAccountant, async (req,
     const total_value = result.rows.reduce((sum, row) => sum + parseFloat(row.stock_value), 0);
 
     res.json({ items: result.rows, total_value });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/reports/best-sellers', authenticate, async (req, res) => {
+  const { branch_id, limit } = req.query;
+  try {
+    let query = `
+      SELECT p.id, p.name, SUM(si.quantity) AS total_quantity_sold, SUM(si.subtotal) AS total_revenue
+      FROM sale_items si
+      JOIN products p ON si.product_id = p.id
+      JOIN sales s ON si.sale_id = s.id
+      WHERE 1=1`;
+    const params = [];
+
+    if (branch_id) {
+      params.push(branch_id);
+      query += ` AND s.branch_id = $${params.length}`;
+    }
+
+    query += ` GROUP BY p.id, p.name ORDER BY total_quantity_sold DESC`;
+
+    if (limit) {
+      params.push(limit);
+      query += ` LIMIT $${params.length}`;
+    }
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
