@@ -87,6 +87,20 @@ app.put('/products/:id', authenticate,requireAccountant, async (req, res) => {
     }
 });
 
+app.put('/products/:id/threshold', authenticate, requireAccountant, async (req, res) => {
+  const { reorder_threshold } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE products SET reorder_threshold = $1 WHERE id = $2 RETURNING *`,
+      [reorder_threshold, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Product not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.delete('/products/:id', authenticate,requireAccountant, async (req, res) => {
     try{
         const result = await pool.query('DELETE FROM products WHERE id= $1 RETURNING *', [req.params.id]);
@@ -109,6 +123,21 @@ app.get('/branches/:id/stock', authenticate, async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
+});
+
+app.get('/branches/:id/low-stock', authenticate, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT p.id, p.name, s.quantity, p.reorder_threshold
+       FROM stock s
+       JOIN products p ON s.product_id = p.id
+       WHERE s.branch_id = $1 AND s.quantity <= p.reorder_threshold`,
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/stock/adjust', authenticate, async (req, res) => {
