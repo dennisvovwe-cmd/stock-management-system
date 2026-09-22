@@ -257,6 +257,30 @@ app.get('/sales/credit/outstanding', authenticate, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+app.put('/sales/:id/payment', authenticate, async (req, res) => {
+  const { additional_payment } = req.body;
+  try {
+    const saleCheck = await pool.query('SELECT * FROM sales WHERE id = $1', [req.params.id]);
+    if (saleCheck.rows.length === 0) return res.status(404).json({ error: 'Sale not found' });
+
+    const sale = saleCheck.rows[0];
+    const newAmountPaid = parseFloat(sale.amount_paid) + parseFloat(additional_payment);
+
+    if (newAmountPaid > parseFloat(sale.total_amount)) {
+      return res.status(400).json({ error: 'Payment exceeds remaining balance' });
+    }
+
+    const result = await pool.query(
+      `UPDATE sales SET amount_paid = $1 WHERE id = $2 RETURNING *`,
+      [newAmountPaid, req.params.id]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 app.listen(PORT, () =>{
     console.log(`Server running on http://localhost:${PORT}`);
 })
