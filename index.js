@@ -310,6 +310,58 @@ app.put('/sales/:id/payment', authenticate, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+app.get('/reports/sales-summary', authenticate, async (req, res) => {
+  const { branch_id, start_date, end_date } = req.query;
+  try {
+    let query = `SELECT COUNT(*) AS total_sales, SUM(total_amount) AS total_revenue, SUM(amount_paid) AS total_collected
+                 FROM sales WHERE 1=1`;
+    const params = [];
+
+    if (branch_id) {
+      params.push(branch_id);
+      query += ` AND branch_id = $${params.length}`;
+    }
+    if (start_date) {
+      params.push(start_date);
+      query += ` AND created_at >= $${params.length}`;
+    }
+    if (end_date) {
+      params.push(end_date);
+      query += ` AND created_at <= $${params.length}`;
+    }
+
+    const result = await pool.query(query, params);
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/reports/stock-valuation', authenticate, requireAccountant, async (req, res) => {
+  const { branch_id } = req.query;
+  try {
+    let query = `
+      SELECT p.id, p.name, s.branch_id, s.quantity, p.cost_price,
+             (s.quantity * p.cost_price) AS stock_value
+      FROM stock s
+      JOIN products p ON s.product_id = p.id
+      WHERE 1=1`;
+    const params = [];
+
+    if (branch_id) {
+      params.push(branch_id);
+      query += ` AND s.branch_id = $${params.length}`;
+    }
+
+    const result = await pool.query(query, params);
+    const total_value = result.rows.reduce((sum, row) => sum + parseFloat(row.stock_value), 0);
+
+    res.json({ items: result.rows, total_value });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 app.listen(PORT, () =>{
     console.log(`Server running on http://localhost:${PORT}`);
 })
