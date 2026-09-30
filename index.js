@@ -162,7 +162,7 @@ app.post('/stock/adjust', authenticate, async (req, res) => {
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
-app.post('/signup', async (req, res) => {
+app.post('/signup', authenticate, requireAccountant, async (req, res) => {
     const { name, email, password, role, branch_id } = req.body;
     try {
         const password_hash = await bcrypt.hash(password, 10);
