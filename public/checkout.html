@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ejisco - New Sale</title>
+<style>
+  :root {
+    --navy: #1b2a6b;
+    --blue: #2f3bd6;
+    --red: #e8352f;
+    --green: #1a9d5a;
+    --muted: #9aa1b4;
+    --border: #e3e5ee;
+    --bg: #f6f7fb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: #1f2547;
+  }
+  header {
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header img { height: 36px; }
+  .user-box { display: flex; align-items: center; gap: 14px; font-size: 14px; }
+  a.back-link { color: var(--blue); text-decoration: none; font-size: 14px; }
+  button.logout {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 14px;
+    cursor: pointer;
+  }
+  main { max-width: 800px; margin: 24px auto; padding: 0 20px 60px; }
+  h2 { margin-top: 0; }
+
+  .panel {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  input, select {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    color: #1f2547;
+  }
+
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+  .field { margin-bottom: 16px; }
+
+  .item-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr auto;
+    gap: 10px;
+    align-items: end;
+    margin-bottom: 12px;
+  }
+  .item-row .subtotal { font-weight: 600; padding-bottom: 11px; }
+  button.remove-item {
+    background: none;
+    border: none;
+    color: var(--red);
+    cursor: pointer;
+    font-size: 18px;
+    padding: 8px;
+  }
+
+  button.add-item {
+    background: var(--bg);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    width: 100%;
+    cursor: pointer;
+    color: var(--blue);
+    font-size: 14px;
+    margin-top: 4px;
+  }
+
+  .credit-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .credit-toggle input { width: auto; }
+
+  .totals {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  button.submit {
+    width: 100%;
+    padding: 15px;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 16px;
+  }
+  button.submit:disabled { opacity: 0.6; cursor: default; }
+
+  #message {
+    margin-top: 14px;
+    text-align: center;
+    font-size: 14px;
+  }
+  #message.error { color: var(--red); }
+  #message.success { color: var(--green); }
+
+  @media (max-width: 640px) {
+    .field-row { grid-template-columns: 1fr; }
+    .item-row {
+      grid-template-columns: 1fr 1fr;
+      align-items: start;
+    }
+    .item-row .subtotal { grid-column: span 2; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="ChatGPT Image Sep 22, 2026, 10_04_10 PM 1.svg" alt="Ejisco">
+  <div class="user-box">
+    <a href="/dashboard.html" class="back-link">← Dashboard</a>
+    <span id="userName"></span>
+    <button class="logout" onclick="logout()">Log out</button>
+  </div>
+</header>
+
+<main>
+  <h2>New Sale</h2>
+
+  <div class="panel">
+    <div class="field-row">
+      <div class="field">
+        <label for="branchSelect">Branch</label>
+        <select id="branchSelect">
+          <option value="1">Branch A</option>
+          <option value="2">Branch B</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="customerName">Customer name</label>
+        <input type="text" id="customerName" placeholder="Walk-in customer">
+      </div>
+    </div>
+
+    <div id="itemsContainer"></div>
+    <button type="button" class="add-item" onclick="addItemRow()">+ Add another product</button>
+  </div>
+
+  <div class="panel">
+    <div class="credit-toggle">
+      <input type="checkbox" id="isCredit" onchange="toggleCredit()">
+      <label for="isCredit" style="margin:0;">This is a credit sale (customer pays later)</label>
+    </div>
+
+    <div class="field" id="amountPaidField">
+      <label for="amountPaid">Amount paid now</label>
+      <input type="number" id="amountPaid" min="0" step="0.01">
+    </div>
+
+    <div class="totals">
+      <span>Total</span>
+      <span id="totalDisplay">0</span>
+    </div>
+
+    <button class="submit" id="submitBtn" onclick="submitSale()">Complete Sale</button>
+    <div id="message"></div>
+  </div>
+</main>
+
+<script>
+  const token = localStorage.getItem('token');
+  if (!token) window.location.href = '/login.html';
+  document.getElementById('userName').textContent = localStorage.getItem('name') || '';
+
+  function logout() {
+    localStorage.clear();
+    window.location.href = '/login.html';
+  }
+
+  async function api(path, options = {}) {
+    const res = await fetch(path, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token,
+        ...(options.headers || {})
+      }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+
+  let products = [];
+  let itemCount = 0;
+
+  async function loadProducts() {
+    try {
+      products = await api('/products');
+    } catch (e) {
+      document.getElementById('message').textContent = 'Could not load products: ' + e.message;
+      document.getElementById('message').className = 'error';
+    }
+  }
+
+  function productOptions() {
+    return products.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  }
+
+  function addItemRow() {
+    itemCount++;
+    const id = itemCount;
+    const container = document.getElementById('itemsContainer');
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.id = 'item-' + id;
+    row.innerHTML = `
+      <div class="field" style="margin-bottom:0;">
+        <label>Product</label>
+        <select onchange="rowChanged(${id})" id="product-${id}">
+          <option value="">Select product</option>
+          ${productOptions()}
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>Qty</label>
+        <input type="number" min="0" step="0.01" value="1" id="qty-${id}" oninput="rowChanged(${id})">
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>Unit price</label>
+        <input type="number" min="0" step="0.01" id="price-${id}" oninput="rowChanged(${id})">
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>Subtotal</label>
+        <div class="subtotal" id="subtotal-${id}">0</div>
+      </div>
+      <button type="button" class="remove-item" onclick="removeRow(${id})" title="Remove">✕</button>
+    `;
+    container.appendChild(row);
+  }
+
+  function removeRow(id) {
+    const row = document.getElementById('item-' + id);
+    if (row) row.remove();
+    recalcTotal();
+  }
+
+  function rowChanged(id) {
+    const productSelect = document.getElementById('product-' + id);
+    const priceInput = document.getElementById('price-' + id);
+    const selectedProduct = products.find(p => String(p.id) === productSelect.value);
+
+    // Auto-fill price when a product is first picked and price is still empty
+    if (selectedProduct && priceInput.value === '' && selectedProduct.selling_price) {
+      priceInput.value = selectedProduct.selling_price;
+    }
+
+    const qty = parseFloat(document.getElementById('qty-' + id).value) || 0;
+    const price = parseFloat(priceInput.value) || 0;
+    document.getElementById('subtotal-' + id).textContent = (qty * price).toLocaleString();
+
+    recalcTotal();
+  }
+
+  function recalcTotal() {
+    let total = 0;
+    document.querySelectorAll('[id^="subtotal-"]').forEach(el => {
+      total += parseFloat(el.textContent.replace(/,/g, '')) || 0;
+    });
+    document.getElementById('totalDisplay').textContent = total.toLocaleString();
+  }
+
+  function toggleCredit() {
+    const isCredit = document.getElementById('isCredit').checked;
+    const field = document.getElementById('amountPaidField');
+    if (isCredit) {
+      field.style.display = 'block';
+    } else {
+      document.getElementById('amountPaid').value = '';
+    }
+  }
+
+  function collectItems() {
+    const items = [];
+    document.querySelectorAll('.item-row').forEach(row => {
+      const id = row.id.split('-')[1];
+      const product_id = document.getElementById('product-' + id).value;
+      const quantity = parseFloat(document.getElementById('qty-' + id).value);
+      const unit_price = parseFloat(document.getElementById('price-' + id).value);
+      if (product_id && quantity > 0 && unit_price >= 0) {
+        items.push({ product_id: Number(product_id), quantity, unit_price });
+      }
+    });
+    return items;
+  }
+
+  async function submitSale() {
+    const messageEl = document.getElementById('message');
+    const submitBtn = document.getElementById('submitBtn');
+    messageEl.textContent = '';
+    messageEl.className = '';
+
+    const branch_id = Number(document.getElementById('branchSelect').value);
+    const customer_name = document.getElementById('customerName').value || 'Walk-in customer';
+    const is_credit = document.getElementById('isCredit').checked;
+    const total = parseFloat(document.getElementById('totalDisplay').textContent.replace(/,/g, '')) || 0;
+    const amount_paid = is_credit
+      ? (parseFloat(document.getElementById('amountPaid').value) || 0)
+      : total;
+
+    const items = collectItems();
+
+    if (items.length === 0) {
+      messageEl.textContent = 'Add at least one product with a quantity and price.';
+      messageEl.className = 'error';
+      return;
+    }
+    if (is_credit && amount_paid > total) {
+      messageEl.textContent = 'Amount paid cannot be more than the total.';
+      messageEl.className = 'error';
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+
+    try {
+      const result = await api('/sales', {
+        method: 'POST',
+        body: JSON.stringify({ branch_id, customer_name, is_credit, amount_paid, items })
+      });
+      messageEl.textContent = `Sale recorded (ID ${result.sale_id}), total ${Number(result.total_amount).toLocaleString()}.`;
+      messageEl.className = 'success';
+      resetForm();
+    } catch (e) {
+      messageEl.textContent = e.message;
+      messageEl.className = 'error';
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Complete Sale';
+    }
+  }
+
+  function resetForm() {
+    document.getElementById('itemsContainer').innerHTML = '';
+    document.getElementById('customerName').value = '';
+    document.getElementById('isCredit').checked = false;
+    document.getElementById('amountPaid').value = '';
+    document.getElementById('amountPaidField').style.display = 'none';
+    addItemRow();
+  }
+
+  loadProducts().then(() => {
+    addItemRow();
+    document.getElementById('amountPaidField').style.display = 'none';
+  });
+</script>
+
+</body>
+</html>

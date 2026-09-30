@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ejisco International Limited -Login</title>
+    <style>
+        :root{
+            --navy: #1b2a6b;
+            --blue: #2f3bd6;
+            --red: #e8352f;
+            --text-muted: #9aa1b4;
+            --border: #e3e5ee;
+        }
+
+        *{ 
+            box-sizing: border- box;
+        }
+
+        body{
+            margin: 0;
+            font-family: -apple-system, "Segoe UI", Roboto, Arial, sans0serif;
+            min-height: 100vh;
+            display: flex;
+            background: #ffffff;
+        }
+
+        .brand-side{
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #ffffff
+        }
+        .full{
+            margin-top: 2%;
+            margin-left: 50px;
+            margin-right: 200px;
+        }
+        .mark-image{
+            width: 500px;
+            max-width: 80%;
+            height: auto;
+        }
+        .form-side {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .form-wrap {
+    width: 100%;
+    max-width: 460px;
+  }
+  h1 {
+    font-size: 30px;
+    font-weight: 400;
+    color: #2027a5;
+    line-height: 1.25;
+    margin: 0 0 32px 0;
+  }
+  .wordmark {
+    display: block;
+    width: 260px;
+    max-width: 80%;
+    height: auto;
+    
+    margin-bottom: 25px;
+  }
+
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .field {
+    margin-top: 35px;
+    position: relative;
+  }
+
+  input[type="email"],
+  input[type="password"],
+  input[type="text"] {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 15px;
+    color: #1f2547;
+    outline: none;
+    transition: border-color 0.15s ease;
+  }
+  input:focus {
+    border-color: var(--blue);
+  }
+
+  .toggle-visibility {
+    position: absolute;
+    right: -10px;
+    top: 40px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 15px;
+    padding: 4px;
+  }
+
+  .row-links {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    margin-bottom: 26px;
+    margin-top: 20px;
+  }
+  .row-links a {
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .row-links a:hover { color: var(--blue); }
+
+  button.primary {
+    width: 109%;
+    padding: 15px;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.primary:hover { background: #262fc2; }
+  button.primary:disabled { opacity: 0.6; cursor: default; }
+
+  .divider {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    margin: 18px 0;
+  }
+
+  button.google {
+    width: 109%;
+    padding: 13px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    color: #333;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  #message {
+    min-height: 18px;
+    color: var(--red);
+    font-size: 13px;
+    margin-top: 14px;
+    text-align: center;
+  }
+
+   @media (max-width: 860px) {
+    body { 
+      flex-direction: column;
+    }
+    
+    .full{
+            margin-top: 10%;
+            margin-left: 13%;
+            margin-right: 15%;
+            margin-bottom: none;
+    }
+    .brand-side { 
+      display: none; 
+    }
+    .form-side {
+      padding: 40px 24px;
+      align-items: flex-start;
+    }
+    .form-wrap { 
+      align-items: center;
+      max-width: 110%;
+     }
+    .wordmark {
+      display: block;
+      margin: 0 auto 40px auto;
+      width: 220px;
+      max-width: 135%;
+      margin-top: 30px;
+    }
+    h1 {
+      font-size: 23px;
+      margin-bottom: 40px;
+    }
+    .field { 
+      margin-bottom: 35px;
+     }
+    .row-links { 
+      margin-bottom: 40px;
+     }
+  }
+    </style>
+</head>
+<body>
+    <div class="brand-side">
+        <img src="E.png" alt="Ejisco logo mark" class="mark-image">
+    </div>
+
+    <div class="full">
+        <img src ="ChatGPT Image Sep 22, 2026, 10_04_10 PM 1.svg" alt="Ejisco International Limited" class="wordmark">
+     <h1>Welcome! <br>please login to your account.</h1>
+    <form id="loginForm" onsubmit="return false;">
+        <div class="field">
+            <label for="email">User Name</label>
+            <input type="email" id="email"
+ placeholder="username@gmail.com" autocomplete="username" required>
+        </div>
+
+        <div class="field">
+            <label for="password">Password</label>
+            <input type="password" id="password" placeholder="••••••••" autocomplete="current-password" required>
+            <button type="button" class="toggle-visibility" id="toggleBtn" aria-label="Show password">Show</button>
+        </div>
+
+       <div class="row-links">
+          <a href="#">Sign up</a>
+          <a href="#">Forget Password?</a>
+        </div>
+
+        <button type="submit" class="primary" id="loginBtn" onclick="login()">Login</button>
+
+        <div class="divider">— Or —</div>
+
+        <button type="button" class="google" disabled title="Not set up yet">
+          Sign up with Google
+        </button>
+
+        <div id="message"></div> 
+    </form>
+    </div>
+ <script>
+  const toggleBtn = document.getElementById('toggleBtn');
+  const passwordInput = document.getElementById('password');
+  toggleBtn.addEventListener('click', () => {
+    const isHidden = passwordInput.type === 'password';
+    passwordInput.type = isHidden ? 'text' : 'password';
+    toggleBtn.textContent = isHidden ? 'Hide' : 'Show';
+  });
+
+  async function login() {
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const messageEl = document.getElementById('message');
+    const loginBtn = document.getElementById('loginBtn');
+
+    messageEl.textContent = '';
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Logging in...';
+
+    try {
+      const response = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        messageEl.textContent = data.error || 'Login failed.';
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Login';
+        return;
+      }
+
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('role', data.role);
+      localStorage.setItem('name', data.name);
+
+      window.location.href = '/dashboard.html';
+
+    } catch (err) {
+      messageEl.textContent = 'Something went wrong. Try again.';
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Login';
+    }
+  }
+</script>
+   
+</body>
+</html>

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ejisco - Dashboard</title>
+    <style>
+        :root{
+        --navy: #1b2a6b;
+        --blue: #2f3bd6;
+        --red: #e8352f;
+        --muted: #9aa1b4;
+        --border: #e3e5ee;
+        --bg: #f6f7fb;
+        }
+         * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: #1f2547;
+  }
+  header {
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header img { height: 36px; }
+  .user-box { display: flex; align-items: center; gap: 14px; font-size: 14px; }
+  .role-badge {
+    background: #eef0ff;
+    color: var(--blue);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    text-transform: capitalize;
+  }
+  button.logout {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 14px;
+    cursor: pointer;
+  }
+  main { max-width: 1000px; margin: 24px auto; padding: 0 20px; }
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  select {
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    background: #fff;
+  }
+    .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .card .Top-bar-icon {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+  }
+  .card .label { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .card .value { font-size: 26px; font-weight: 700; line-height: 1; }
+  section.panel {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 20px;
+    overflow-x: auto;
+  }
+    section.panel h3 { margin: 0 0 12px 0; font-size: 16px; }
+  .panel-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .panel-icon {
+    width: 36px;
+    height: 36px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  .empty { color: var(--muted); font-size: 14px; }
+  .low { color: var(--red); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="ChatGPT Image Sep 22, 2026, 10_04_10 PM 1.svg" alt="Ejisco">
+  <div class="user-box">
+    <span id="userName"></span>
+    <span class="role-badge" id="userRole"></span>
+    <button class="logout" onclick="logout()">Log out</button>
+  </div>
+</header>
+
+<main>
+  <div class="toolbar">
+    <label for="branchSelect">Branch:</label>
+    <select id="branchSelect" onchange="loadAll()">
+      <option value="1">Branch A</option>
+      <option value="2">Branch B</option>
+    </select>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <img src="Top bar icon.svg" alt="" class="Top-bar-icon">
+      <div>
+        <div class="label">Total sales</div>
+        <div class="value" id="totalSales">-</div>
+      </div>
+    </div>
+    <div class="card">
+      <img src="Top bar icon.svg" alt="" class="Top-bar-icon">
+      <div>
+        <div class="label">Revenue</div>
+        <div class="value" id="totalRevenue">-</div>
+      </div>
+    </div>
+    <div class="card">
+      <img src="Top bar icon.svg" alt="" class="Top-bar-icon">
+      <div>
+        <div class="label">Collected</div>
+        <div class="value" id="totalCollected">-</div>
+      </div>
+    </div>
+  </div>
+
+    <section class="panel">
+    <h3 class="panel-title">
+      <img src="low bar icon.svg" alt="" class="panel-icon">
+      Low stock
+    </h3>
+    <div id="lowStock" class="empty">Loading...</div>
+  </section>
+
+  <section class="panel">
+    <h3>Current stock</h3>
+    <div id="stockTable" class="empty">Loading...</div>
+  </section>
+
+  <section class="panel">
+    <h3>Outstanding credit</h3>
+    <div id="creditTable" class="empty">Loading...</div>
+  </section>
+</main>
+
+<script>
+  const token = localStorage.getItem('token');
+  if (!token) window.location.href = '/login.html';
+
+  document.getElementById('userName').textContent = localStorage.getItem('name') || '';
+  document.getElementById('userRole').textContent = localStorage.getItem('role') || '';
+
+  function logout() {
+    localStorage.clear();
+    window.location.href = '/login.html';
+  }
+
+  async function api(path) {
+    const res = await fetch(path, { headers: { Authorization: 'Bearer ' + token } });
+    if (res.status === 401 || res.status === 403) {
+      const body = await res.json().catch(() => ({}));
+      if (body.error && body.error.includes('token')) logout();
+      throw new Error(body.error || 'Not allowed');
+    }
+    return res.json();
+  }
+
+  function fmt(n) {
+    return Number(n || 0).toLocaleString();
+  }
+
+  function table(headers, rows) {
+    if (rows.length === 0) return '<div class="empty">Nothing to show.</div>';
+    const head = headers.map(h => `<th>${h}</th>`).join('');
+    const body = rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
+    return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+  }
+
+  async function loadAll() {
+    const branch = document.getElementById('branchSelect').value;
+
+    try {
+      const s = await api('/reports/sales-summary?branch_id=' + branch);
+      document.getElementById('totalSales').textContent = fmt(s.total_sales);
+      document.getElementById('totalRevenue').textContent = fmt(s.total_revenue);
+      document.getElementById('totalCollected').textContent = fmt(s.total_collected);
+    } catch (e) {}
+
+    try {
+      const low = await api(`/branches/${branch}/low-stock`);
+      document.getElementById('lowStock').innerHTML = table(
+        ['Product', 'In stock', 'Reorder at'],
+        low.map(p => [p.name, `<span class="low">${p.quantity}</span>`, p.reorder_threshold])
+      );
+    } catch (e) {
+      document.getElementById('lowStock').textContent = e.message;
+    }
+
+    try {
+      const stock = await api(`/branches/${branch}/stock`);
+      document.getElementById('stockTable').innerHTML = table(
+        ['Product', 'Quantity'],
+        stock.map(p => [p.name, p.quantity])
+      );
+    } catch (e) {
+      document.getElementById('stockTable').textContent = e.message;
+    }
+
+    try {
+      const credit = await api('/sales/credit/outstanding');
+      const rows = credit.filter(c => String(c.branch_id) === String(branch));
+      document.getElementById('creditTable').innerHTML = table(
+        ['Customer', 'Total', 'Paid', 'Owed'],
+        rows.map(c => [c.customer_name, fmt(c.total_amount), fmt(c.amount_paid), fmt(c.balance_owed)])
+      );
+    } catch (e) {
+      document.getElementById('creditTable').textContent = e.message;
+    }
+  }
+
+  loadAll();
+</script>
+
+</body>
+</html>

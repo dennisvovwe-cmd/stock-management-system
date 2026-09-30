@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ejisco - Adjust Stock</title>
+<style>
+  :root {
+    --navy: #1b2a6b;
+    --blue: #2f3bd6;
+    --red: #e8352f;
+    --green: #1a9d5a;
+    --muted: #9aa1b4;
+    --border: #e3e5ee;
+    --bg: #f6f7fb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: #1f2547;
+  }
+  header {
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header img { height: 36px; }
+  .user-box { display: flex; align-items: center; gap: 14px; font-size: 14px; }
+  a.back-link { color: var(--blue); text-decoration: none; font-size: 14px; }
+  button.logout {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 14px;
+    cursor: pointer;
+  }
+  main { max-width: 560px; margin: 24px auto; padding: 0 20px 60px; }
+  h2 { margin-top: 0; }
+
+  .panel {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  input, select {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    color: #1f2547;
+  }
+  .field { margin-bottom: 16px; }
+
+  .current-stock {
+    background: var(--bg);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 14px;
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .current-stock .qty { font-weight: 700; }
+
+  .direction-toggle {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .direction-btn {
+    flex: 1;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    text-align: center;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .direction-btn.active.add { border-color: var(--green); color: var(--green); background: #eafaf1; }
+  .direction-btn.active.remove { border-color: var(--red); color: var(--red); background: #fdecea; }
+
+  .preview {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+  .preview .new-qty { font-weight: 700; color: #1f2547; }
+
+  button.submit {
+    width: 100%;
+    padding: 15px;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.submit:disabled { opacity: 0.6; cursor: default; }
+
+  #message { margin-top: 14px; text-align: center; font-size: 14px; }
+  #message.error { color: var(--red); }
+  #message.success { color: var(--green); }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="ChatGPT Image Sep 22, 2026, 10_04_10 PM 1.svg" alt="Ejisco">
+  <div class="user-box">
+    <a href="/dashboard.html" class="back-link">← Dashboard</a>
+    <span id="userName"></span>
+    <button class="logout" onclick="logout()">Log out</button>
+  </div>
+</header>
+
+<main>
+  <h2>Adjust Stock</h2>
+
+  <div class="panel">
+    <div class="field">
+      <label for="branchSelect">Branch</label>
+      <select id="branchSelect" onchange="loadCurrentStock()">
+        <option value="1">Branch A</option>
+        <option value="2">Branch B</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="productSelect">Product</label>
+      <select id="productSelect" onchange="loadCurrentStock()">
+        <option value="">Loading products...</option>
+      </select>
+    </div>
+
+    <div class="current-stock" id="currentStockBox" style="display:none;">
+      <span>Current stock</span>
+      <span class="qty" id="currentQty">-</span>
+    </div>
+
+    <label>Adjustment type</label>
+    <div class="direction-toggle">
+      <div class="direction-btn add active" id="btnAdd" onclick="setDirection('add')">+ Add stock</div>
+      <div class="direction-btn remove" id="btnRemove" onclick="setDirection('remove')">− Remove stock</div>
+    </div>
+
+    <div class="field">
+      <label for="amount">Quantity</label>
+      <input type="number" id="amount" min="0" step="0.01" oninput="updatePreview()">
+    </div>
+
+    <div class="field">
+      <label for="reason">Reason</label>
+      <select id="reason">
+        <option value="restock">Restock (new delivery)</option>
+        <option value="correction">Correction / stock count fix</option>
+        <option value="damaged">Damaged / lost</option>
+        <option value="transfer">Transfer between branches</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+
+    <div class="preview" id="preview"></div>
+
+    <button class="submit" id="submitBtn" onclick="submitAdjustment()">Save Adjustment</button>
+    <div id="message"></div>
+  </div>
+</main>
+
+<script>
+  const token = localStorage.getItem('token');
+  if (!token) window.location.href = '/login.html';
+  document.getElementById('userName').textContent = localStorage.getItem('name') || '';
+
+  function logout() {
+    localStorage.clear();
+    window.location.href = '/login.html';
+  }
+
+  async function api(path, options = {}) {
+    const res = await fetch(path, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token,
+        ...(options.headers || {})
+      }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+
+  let products = [];
+  let direction = 'add'; // 'add' or 'remove'
+  let currentQtyValue = null;
+
+  function setDirection(dir) {
+    direction = dir;
+    document.getElementById('btnAdd').classList.toggle('active', dir === 'add');
+    document.getElementById('btnRemove').classList.toggle('active', dir === 'remove');
+    updatePreview();
+  }
+
+  async function loadProducts() {
+    try {
+      products = await api('/products');
+      const select = document.getElementById('productSelect');
+      select.innerHTML = '<option value="">Select product</option>' +
+        products.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    } catch (e) {
+      document.getElementById('message').textContent = 'Could not load products: ' + e.message;
+      document.getElementById('message').className = 'error';
+    }
+  }
+
+  async function loadCurrentStock() {
+    const branch = document.getElementById('branchSelect').value;
+    const productId = document.getElementById('productSelect').value;
+    const box = document.getElementById('currentStockBox');
+
+    if (!productId) {
+      box.style.display = 'none';
+      currentQtyValue = null;
+      updatePreview();
+      return;
+    }
+
+    try {
+      const stock = await api(`/branches/${branch}/stock`);
+      const match = stock.find(s => String(s.id) === String(productId));
+      currentQtyValue = match ? match.quantity : 0;
+      document.getElementById('currentQty').textContent = currentQtyValue;
+      box.style.display = 'flex';
+    } catch (e) {
+      box.style.display = 'none';
+      currentQtyValue = null;
+    }
+    updatePreview();
+  }
+
+  function updatePreview() {
+    const previewEl = document.getElementById('preview');
+    const amount = parseFloat(document.getElementById('amount').value) || 0;
+
+    if (currentQtyValue === null || amount <= 0) {
+      previewEl.textContent = '';
+      return;
+    }
+
+    const change = direction === 'add' ? amount : -amount;
+    const newQty = currentQtyValue + change;
+
+    if (direction === 'remove' && newQty < 0) {
+      previewEl.innerHTML = `<span style="color: var(--red);">This would take stock below zero (${newQty}). Check the quantity.</span>`;
+      return;
+    }
+
+    previewEl.innerHTML = `New stock will be <span class="new-qty">${newQty}</span>`;
+  }
+
+  async function submitAdjustment() {
+    const messageEl = document.getElementById('message');
+    const submitBtn = document.getElementById('submitBtn');
+    messageEl.textContent = '';
+    messageEl.className = '';
+
+    const branch_id = Number(document.getElementById('branchSelect').value);
+    const product_id = Number(document.getElementById('productSelect').value);
+    const amount = parseFloat(document.getElementById('amount').value);
+    const reason = document.getElementById('reason').value;
+
+    if (!product_id) {
+      messageEl.textContent = 'Select a product.';
+      messageEl.className = 'error';
+      return;
+    }
+    if (!amount || amount <= 0) {
+      messageEl.textContent = 'Enter a quantity greater than 0.';
+      messageEl.className = 'error';
+      return;
+    }
+
+    const change_amount = direction === 'add' ? amount : -amount;
+
+    if (direction === 'remove' && currentQtyValue !== null && (currentQtyValue + change_amount) < 0) {
+      messageEl.textContent = 'This would take stock below zero. Check the quantity.';
+      messageEl.className = 'error';
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+
+    try {
+      await api('/stock/adjust', {
+        method: 'POST',
+        body: JSON.stringify({ product_id, branch_id, change_amount, reason })
+      });
+      messageEl.textContent = 'Stock updated.';
+      messageEl.className = 'success';
+      document.getElementById('amount').value = '';
+      await loadCurrentStock();
+    } catch (e) {
+      messageEl.textContent = e.message;
+      messageEl.className = 'error';
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Save Adjustment';
+    }
+  }
+
+  loadProducts();
+</script>
+
+</body>
+</html>
