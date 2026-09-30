@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ejisco - Credit</title>
+<style>
+  :root {
+    --navy: #1b2a6b;
+    --blue: #2f3bd6;
+    --red: #e8352f;
+    --green: #1a9d5a;
+    --muted: #9aa1b4;
+    --border: #e3e5ee;
+    --bg: #f6f7fb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: #1f2547;
+  }
+  header {
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header img { height: 36px; }
+  .user-box { display: flex; align-items: center; gap: 14px; font-size: 14px; }
+  a.back-link { color: var(--blue); text-decoration: none; font-size: 14px; }
+  button.logout {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 14px;
+    cursor: pointer;
+  }
+  main { max-width: 1000px; margin: 24px auto; padding: 0 20px 60px; }
+  h2 { margin: 0 0 20px 0; }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab {
+    padding: 9px 16px;
+    border-radius: 20px;
+    background: #fff;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .tab.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+  .panel {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    overflow-x: auto;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; }
+  .owed { color: var(--red); font-weight: 600; }
+  .empty { color: var(--muted); font-size: 14px; padding: 20px 0; text-align: center; }
+  button.pay {
+    background: var(--green);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 25, 50, 0.4);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 10;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: #fff;
+    border-radius: 14px;
+    padding: 24px;
+    width: 100%;
+    max-width: 380px;
+  }
+  .modal h3 { margin-top: 0; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+  .balance-hint { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 10px; }
+  .modal-actions button { flex: 1; padding: 11px; border-radius: 8px; border: none; font-size: 14px; cursor: pointer; }
+  .modal-actions .cancel { background: var(--bg); color: #1f2547; }
+  .modal-actions .save { background: var(--blue); color: #fff; font-weight: 600; }
+  #formMessage { font-size: 13px; color: var(--red); margin-bottom: 10px; min-height: 16px; }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="ChatGPT Image Sep 22, 2026, 10_04_10 PM 1.svg" alt="Ejisco">
+  <div class="user-box">
+    <a href="/dashboard.html" class="back-link">← Dashboard</a>
+    <span id="userName"></span>
+    <button class="logout" onclick="logout()">Log out</button>
+  </div>
+</header>
+
+<main>
+  <h2>Credit</h2>
+
+  <div class="tabs">
+    <div class="tab active" id="tabBySale" onclick="showTab('sale')">By sale</div>
+    <div class="tab" id="tabByCustomer" onclick="showTab('customer')">By customer</div>
+  </div>
+
+  <div class="panel">
+    <div id="tableContainer" class="empty">Loading...</div>
+  </div>
+</main>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3>Record Payment</h3>
+    <div id="formMessage"></div>
+    <div class="balance-hint" id="balanceHint"></div>
+    <label>Amount received</label>
+    <input type="number" step="0.01" id="f_amount">
+    <div class="modal-actions">
+      <button class="cancel" onclick="closeModal()">Cancel</button>
+      <button class="save" id="saveBtn" onclick="submitPayment()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const token = localStorage.getItem('token');
+  if (!token) window.location.href = '/login.html';
+  document.getElementById('userName').textContent = localStorage.getItem('name') || '';
+
+  function logout() {
+    localStorage.clear();
+    window.location.href = '/login.html';
+  }
+
+  async function api(path, options = {}) {
+    const res = await fetch(path, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token,
+        ...(options.headers || {})
+      }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+
+  function fmt(n) { return Number(n || 0).toLocaleString(); }
+
+  let currentTab = 'sale';
+  let bySaleData = [];
+  let payingSale = null;
+
+  function showTab(tab) {
+    currentTab = tab;
+    document.getElementById('tabBySale').classList.toggle('active', tab === 'sale');
+    document.getElementById('tabByCustomer').classList.toggle('active', tab === 'customer');
+    render();
+  }
+
+  async function loadData() {
+    try {
+      bySaleData = await api('/sales/credit/outstanding');
+      render();
+    } catch (e) {
+      document.getElementById('tableContainer').textContent = e.message;
+    }
+  }
+
+  function render() {
+    if (currentTab === 'sale') renderBySale();
+    else renderByCustomer();
+  }
+
+  function renderBySale() {
+    if (bySaleData.length === 0) {
+      document.getElementById('tableContainer').innerHTML = '<div class="empty">No outstanding credit. Everyone is paid up.</div>';
+      return;
+    }
+    const rows = bySaleData.map(c => `
+      <tr>
+        <td>#${c.id}</td>
+        <td>${c.customer_name}</td>
+        <td>${fmt(c.total_amount)}</td>
+        <td>${fmt(c.amount_paid)}</td>
+        <td class="owed">${fmt(c.balance_owed)}</td>
+        <td>${new Date(c.created_at).toLocaleDateString()}</td>
+        <td><button class="pay" onclick="openPayModal(${c.id}, '${c.customer_name.replace(/'/g, "\\'")}', ${c.balance_owed})">Record payment</button></td>
+      </tr>
+    `).join('');
+
+    document.getElementById('tableContainer').innerHTML = `
+      <table>
+        <thead><tr><th>Sale</th><th>Customer</th><th>Total</th><th>Paid</th><th>Owed</th><th>Date</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  async function renderByCustomer() {
+    document.getElementById('tableContainer').innerHTML = '<div class="empty">Loading...</div>';
+    try {
+      const data = await api('/sales/credit/by-customer');
+      if (data.length === 0) {
+        document.getElementById('tableContainer').innerHTML = '<div class="empty">No outstanding credit. Everyone is paid up.</div>';
+        return;
+      }
+      const rows = data.map(c => `
+        <tr>
+          <td>${c.customer_name}</td>
+          <td>${c.number_of_sales}</td>
+          <td>${fmt(c.total_billed)}</td>
+          <td>${fmt(c.total_paid)}</td>
+          <td class="owed">${fmt(c.total_owed)}</td>
+        </tr>
+      `).join('');
+      document.getElementById('tableContainer').innerHTML = `
+        <table>
+          <thead><tr><th>Customer</th><th># Sales</th><th>Total billed</th><th>Total paid</th><th>Total owed</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    } catch (e) {
+      document.getElementById('tableContainer').textContent = e.message;
+    }
+  }
+
+  function openPayModal(saleId, customerName, balance) {
+    payingSale = saleId;
+    document.getElementById('balanceHint').textContent = `${customerName} owes ${fmt(balance)} on this sale.`;
+    document.getElementById('f_amount').value = '';
+    document.getElementById('formMessage').textContent = '';
+    document.getElementById('overlay').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('overlay').classList.remove('open');
+  }
+
+  async function submitPayment() {
+    const messageEl = document.getElementById('formMessage');
+    const saveBtn = document.getElementById('saveBtn');
+    const amount = parseFloat(document.getElementById('f_amount').value);
+
+    if (!amount || amount <= 0) {
+      messageEl.textContent = 'Enter an amount greater than 0.';
+      return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+
+    try {
+      await api(`/sales/${payingSale}/payment`, {
+        method: 'PUT',
+        body: JSON.stringify({ additional_payment: amount })
+      });
+      closeModal();
+      await loadData();
+    } catch (e) {
+      messageEl.textContent = e.message;
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    }
+  }
+
+  loadData();
+</script>
+
+</body>
+</html>

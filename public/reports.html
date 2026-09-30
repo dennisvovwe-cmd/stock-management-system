@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ejisco - Reports</title>
+<style>
+  :root {
+    --navy: #1b2a6b;
+    --blue: #2f3bd6;
+    --red: #e8352f;
+    --green: #1a9d5a;
+    --muted: #9aa1b4;
+    --border: #e3e5ee;
+    --bg: #f6f7fb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: #1f2547;
+  }
+  header {
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header img { height: 36px; }
+  .user-box { display: flex; align-items: center; gap: 14px; font-size: 14px; }
+  a.back-link { color: var(--blue); text-decoration: none; font-size: 14px; }
+  button.logout {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 14px;
+    cursor: pointer;
+  }
+  main { max-width: 1000px; margin: 24px auto; padding: 0 20px 60px; }
+  h2 { margin: 0 0 20px 0; }
+
+  .toolbar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: end; }
+  .toolbar .field { display: flex; flex-direction: column; gap: 6px; }
+  .toolbar label { font-size: 12px; color: var(--muted); }
+  .toolbar select, .toolbar input {
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    background: #fff;
+  }
+  button.apply {
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    height: 38px;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+  }
+  .card .label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .card .value { font-size: 24px; font-weight: 700; }
+
+  section.panel {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 20px;
+    overflow-x: auto;
+  }
+  section.panel h3 { margin: 0 0 14px 0; font-size: 16px; display: flex; justify-content: space-between; align-items: center; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  .empty { color: var(--muted); font-size: 14px; }
+  .locked { color: var(--muted); font-size: 14px; font-style: italic; }
+  .rank { color: var(--muted); width: 24px; }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="ChatGPT Image Sep 22, 2026, 10_04_10 PM 1.svg" alt="Ejisco">
+  <div class="user-box">
+    <a href="/dashboard.html" class="back-link">← Dashboard</a>
+    <span id="userName"></span>
+    <button class="logout" onclick="logout()">Log out</button>
+  </div>
+</header>
+
+<main>
+  <h2>Reports</h2>
+
+  <div class="toolbar">
+    <div class="field">
+      <label for="branchSelect">Branch</label>
+      <select id="branchSelect">
+        <option value="">All branches</option>
+        <option value="1">Branch A</option>
+        <option value="2">Branch B</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="startDate">From</label>
+      <input type="date" id="startDate">
+    </div>
+    <div class="field">
+      <label for="endDate">To</label>
+      <input type="date" id="endDate">
+    </div>
+    <button class="apply" onclick="loadAll()">Apply</button>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="label">Total sales</div><div class="value" id="totalSales">-</div></div>
+    <div class="card"><div class="label">Revenue</div><div class="value" id="totalRevenue">-</div></div>
+    <div class="card"><div class="label">Collected</div><div class="value" id="totalCollected">-</div></div>
+  </div>
+
+  <section class="panel">
+    <h3>Best-selling products</h3>
+    <div id="bestSellers" class="empty">Loading...</div>
+  </section>
+
+  <section class="panel">
+    <h3>Stock valuation</h3>
+    <div id="stockValuation" class="empty">Loading...</div>
+  </section>
+</main>
+
+<script>
+  const token = localStorage.getItem('token');
+  const role = localStorage.getItem('role');
+  if (!token) window.location.href = '/login.html';
+  document.getElementById('userName').textContent = localStorage.getItem('name') || '';
+
+  function logout() {
+    localStorage.clear();
+    window.location.href = '/login.html';
+  }
+
+  async function api(path) {
+    const res = await fetch(path, { headers: { Authorization: 'Bearer ' + token } });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+
+  function fmt(n) { return Number(n || 0).toLocaleString(); }
+
+  function table(headers, rows) {
+    if (rows.length === 0) return '<div class="empty">No data for this range.</div>';
+    const head = headers.map(h => `<th>${h}</th>`).join('');
+    const body = rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
+    return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+  }
+
+  function buildQuery() {
+    const branch = document.getElementById('branchSelect').value;
+    const start = document.getElementById('startDate').value;
+    const end = document.getElementById('endDate').value;
+    const params = new URLSearchParams();
+    if (branch) params.set('branch_id', branch);
+    if (start) params.set('start_date', start);
+    if (end) params.set('end_date', end);
+    return params.toString();
+  }
+
+  async function loadAll() {
+    const query = buildQuery();
+
+    try {
+      const s = await api('/reports/sales-summary' + (query ? '?' + query : ''));
+      document.getElementById('totalSales').textContent = fmt(s.total_sales);
+      document.getElementById('totalRevenue').textContent = fmt(s.total_revenue);
+      document.getElementById('totalCollected').textContent = fmt(s.total_collected);
+    } catch (e) {
+      document.getElementById('totalSales').textContent = '-';
+    }
+
+    try {
+      const branch = document.getElementById('branchSelect').value;
+      const bsParams = new URLSearchParams();
+      if (branch) bsParams.set('branch_id', branch);
+      bsParams.set('limit', '10');
+      const best = await api('/reports/best-sellers?' + bsParams.toString());
+      document.getElementById('bestSellers').innerHTML = table(
+        ['#', 'Product', 'Qty sold', 'Revenue'],
+        best.map((p, i) => [i + 1, p.name, fmt(p.total_quantity_sold), fmt(p.total_revenue)])
+      );
+    } catch (e) {
+      document.getElementById('bestSellers').textContent = e.message;
+    }
+
+    try {
+      const branch = document.getElementById('branchSelect').value;
+      const svParams = new URLSearchParams();
+      if (branch) svParams.set('branch_id', branch);
+      const val = await api('/reports/stock-valuation?' + svParams.toString());
+      const rows = val.items.map(i => [i.name, i.branch_id, i.quantity, fmt(i.cost_price), fmt(i.stock_value)]);
+      document.getElementById('stockValuation').innerHTML =
+        table(['Product', 'Branch', 'Qty', 'Cost price', 'Value'], rows) +
+        `<div style="margin-top:12px; font-weight:700;">Total stock value: ${fmt(val.total_value)}</div>`;
+    } catch (e) {
+      document.getElementById('stockValuation').innerHTML = `<div class="locked">Accountant access only.</div>`;
+    }
+  }
+
+  loadAll();
+</script>
+
+</body>
+</html>
