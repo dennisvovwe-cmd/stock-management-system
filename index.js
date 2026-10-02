@@ -177,27 +177,87 @@ app.post('/signup', authenticate, requireAccountant, async (req, res) => {
     }
 }); 
 
+app.post('/signup-request', async (req, res) => {
+  const { name, email, password, role, branch_id } = req.body;
+  try {
+    const password_hash = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      `INSERT INTO users (name, email, password_hash, role, branch_id, status)
+       VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING id, name, email, role, branch_id, status`,
+      [name, email, password_hash, role, branch_id]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/signup-requests', authenticate, requireAccountant, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, email, role, branch_id, created_at FROM users WHERE status = 'pending' ORDER BY created_at ASC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/signup-requests/:id/approve', authenticate, requireAccountant, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE users SET status = 'approved' WHERE id = $1 AND status = 'pending' RETURNING id, name, email, role, status`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Request not found or already handled' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/signup-requests/:id/reject', authenticate, requireAccountant, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE users SET status = 'rejected' WHERE id = $1 AND status = 'pending' RETURNING id, name, email, role, status`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Request not found or already handled' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/login', async (req, res) => {
-    const { email, password } = req.body;
-    try {
-        const result = await pool.query('SELECT * FROM users WHERE email=$1', [email]);
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Invalid email or password' });
+  const { email, password } = req.body;
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
     const user = result.rows[0];
-    const match = await bcrypt.compare(password,user.password_hash);
-    if (!match){
-        return res.status(404).json({ error: 'Invalid email or password' });
-}
-const token = jwt.sign(
-    { id: user.id, role: user.role, branch_id: user.branch_id }, 
-    process.env.JWT_SECRET, 
-    { expiresIn: '1h' }
-);
-res.json({ token, role: user.role, name: user.name });
-} catch (err) {
+
+    if (user.status === 'pending') {
+      return res.status(403).json({ error: 'Your account is awaiting approval.' });
+    }
+    if (user.status === 'rejected') {
+      return res.status(403).json({ error: 'Your account request was not approved.' });
+    }
+
+    const match = await bcrypt.compare(password, user.password_hash);
+    if (!match) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    const token = jwt.sign(
+      { id: user.id, role: user.role, branch_id: user.branch_id },
+      process.env.JWT_SECRET,
+      { expiresIn: '8h' }
+    );
+    res.json({ token, role: user.role, name: user.name });
+  } catch (err) {
     res.status(500).json({ error: err.message });
-}
+  }
 });
 
 app.post('/sales', authenticate, async (req, res) => {
