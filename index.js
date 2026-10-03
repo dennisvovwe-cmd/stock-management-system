@@ -20,11 +20,29 @@ function authenticate(req, res, next) {
 }
 
 function requireAccountant(req, res, next) {
-  if (req.user.role !== 'accountant') {
+  if (req.user.role !== 'accountant' && req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Accountant access only' });
   }
   next();
 }
+
+function requireAdmin(req, res, next) {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access only' });
+  }
+  next();
+}
+
+app.get('/users', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, email, password, role, branch_id, status, created_at FROM users ORDER BY created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.post('/products', authenticate,requireAccountant, async (req, res) => {
     const { name, description, category, unit_type, cost_price, selling_price} = req.body;
@@ -255,6 +273,100 @@ app.post('/login', async (req, res) => {
       { expiresIn: '8h' }
     );
     res.json({ token, role: user.role, name: user.name });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/password-reset-request', async (req, res) => {
+  const { email, new_password, confirm_password } = req.body;
+
+  if (!email || !new_password || !confirm_password) {
+    return res.status(400).json({ error: 'Fill in all fields.' });
+  }
+  if (new_password !== confirm_password) {
+    return res.status(400).json({ error: 'Passwords do not match.' });
+  }
+  if (new_password.length < 6) {
+    return res.status(400).json({ error: 'Password should be at least 6 characters.' });
+  }
+
+  try {
+    const userResult = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'No account found with that email.' });
+    }
+    const user_id = userResult.rows[0].id;
+    const new_password_hash = await bcrypt.hash(new_password, 10);
+
+    await pool.query(
+      `INSERT INTO password_reset_requests (user_id, new_password_hash) VALUES ($1, $2)`,
+      [user_id, new_password_hash]
+    );
+
+    res.status(201).json({ message: 'Reset request submitted for approval.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/password-reset-requests', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT prr.id, prr.created_at, u.id AS user_id, u.name, u.email, u.role
+       FROM password_reset_requests prr
+       JOIN users u ON prr.user_id = u.id
+       WHERE prr.status = 'pending'
+       ORDER BY prr.created_at ASC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/password-reset-requests/:id/approve', authenticate, requireAdmin, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const reqResult = await client.query(
+      `SELECT * FROM password_reset_requests WHERE id = $1 AND status = 'pending'`,
+      [req.params.id]
+    );
+    if (reqResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Request not found or already handled' });
+    }
+    const resetRequest = reqResult.rows[0];
+
+    await client.query(
+      `UPDATE users SET password_hash = $1 WHERE id = $2`,
+      [resetRequest.new_password_hash, resetRequest.user_id]
+    );
+    await client.query(
+      `UPDATE password_reset_requests SET status = 'approved' WHERE id = $1`,
+      [req.params.id]
+    );
+
+    await client.query('COMMIT');
+    res.json({ message: 'Password reset approved and applied.' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+app.put('/password-reset-requests/:id/reject', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE password_reset_requests SET status = 'rejected' WHERE id = $1 AND status = 'pending' RETURNING id`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Request not found or already handled' });
+    res.json({ message: 'Request rejected' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

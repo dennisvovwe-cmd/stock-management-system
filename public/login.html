@@ -99,14 +99,18 @@
 
   .toggle-visibility {
     position: absolute;
-    right: -10px;
-    top: 40px;
+    right: 12px;
+    top: 36px;
     background: none;
     border: none;
     cursor: pointer;
-    color: var(--text-muted);
-    font-size: 15px;
     padding: 4px;
+    display: flex;
+    align-items: center;
+  }
+  .toggle-visibility img {
+    width: 20px;
+    height: 20px;
   }
 
   .row-links {
@@ -224,13 +228,15 @@
         </div>
 
         <div class="field">
-            <label for="password">Password</label>
-            <input type="password" id="password" placeholder="••••••••" autocomplete="current-password" required>
-            <button type="button" class="toggle-visibility" id="toggleBtn" aria-label="Show password">Show</button>
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="••••••••" autocomplete="current-password" required>
+          <button type="button" class="toggle-visibility" id="toggleBtn" aria-label="Show password">
+            <img src="octicon_eye-closed-24.svg" alt="Show password" id="toggleIcon">
+          </button>
         </div>
 
        <div class="row-links">
-          <a href="#">Sign up</a>
+          <a href="signup.html">Sign up</a>
           <a href="#">Forget Password?</a>
         </div>
 
@@ -246,14 +252,14 @@
     </form>
     </div>
  <script>
-  const toggleBtn = document.getElementById('toggleBtn');
+    const toggleBtn = document.getElementById('toggleBtn');
+  const toggleIcon = document.getElementById('toggleIcon');
   const passwordInput = document.getElementById('password');
   toggleBtn.addEventListener('click', () => {
     const isHidden = passwordInput.type === 'password';
     passwordInput.type = isHidden ? 'text' : 'password';
-    toggleBtn.textContent = isHidden ? 'Hide' : 'Show';
+    toggleIcon.src = isHidden ? 'eye.svg' : 'octicon_eye-closed-24.svg';
   });
-
   async function login() {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;

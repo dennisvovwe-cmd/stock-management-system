@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ejisco - Create an Account</title>
+<style>
+  :root {
+    --navy: #1b2a6b;
+    --blue: #2f3bd6;
+    --red: #e8352f;
+    --text-muted: #9aa1b4;
+    --border: #e3e5ee;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    background: #ffffff;
+  }
+
+  .brand-side {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+  }
+  .brand-side img { width: 600px; max-width: 80%; height: auto; }
+
+  .form-side {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 40px;
+    height: 100vh;
+    overflow: hidden;
+  }
+  .form-wrap { width: 100%; max-width: 460px; }
+  .form-wrap { width: 100%; max-width: 460px; }
+
+  .wordmark {
+    display: block;
+    width: 200px;
+    max-width: 60%;
+    height: auto;
+    margin-bottom: 16px;
+  }
+
+  h1 {
+    font-size: 24px;
+    font-weight: 500;
+    color: #2027a5;
+    margin: 0 0 4px 0;
+  }
+  .subhead {
+    font-size: 13px;
+    color: #1b2a6b;
+    margin-bottom: 18px;
+  }
+  .subhead a { color: var(--blue); text-decoration: none; font-weight: 600; }
+  .subhead a:hover { text-decoration: underline; }
+
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  .field { margin-bottom: 20px; position: relative; }
+
+  input, select {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 15px;
+    color: #1f2547;
+    outline: none;
+    background: #fff;
+    appearance: none;
+  }
+  input:focus, select:focus { border-color: var(--blue); }
+
+  select {
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa1b4' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 18px;
+  }
+
+  .toggle-visibility {
+    position: absolute;
+    right: 12px;
+    top: 26px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+  }
+  .toggle-visibility img {
+    width: 20px;
+    height: 20px;
+  }
+
+  button.primary {
+    width: 100%;
+    padding: 15px;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 6px;
+  }
+  button.primary:hover { background: #262fc2; }
+  button.primary:disabled { opacity: 0.6; cursor: default; }
+
+  .bottom-link {
+    text-align:left;
+    font-size: 14px;
+    color: #1f2547;
+  }
+  .bottom-link a { color: var(--blue); text-decoration: none; font-weight: 600; }
+  .bottom-link a:hover { text-decoration: underline; }
+
+  #message {
+    min-height: 18px;
+    font-size: 13px;
+    margin-top: 14px;
+    text-align: center;
+  }
+  #message.error { color: var(--red); }
+  #message.success { color: #1a9d5a; }
+
+  @media (max-width: 860px) {
+    .brand-side { display: none; }
+    .form-side { padding: 24px; align-items: flex-start; }
+    .form-wrap { max-width: 100%; }
+    .wordmark { margin: 0 auto 28px auto; }
+    h1 { font-size: 24px; text-align: left; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="brand-side">
+    <img src="E.png" alt="Ejisco logo mark">
+  </div>
+
+  <div class="form-side">
+    <div class="form-wrap">
+      <img src="ChatGPT Image Sep 22, 2026, 10_04_10 PM 1.svg" alt="Ejisco International Limited" class="wordmark">
+
+      <h1>Create an account</h1>
+      <div class="subhead">Already have an account? <a href="/login.html">Log in</a></div>
+
+      <div class="field">
+        <label for="f_name">Full name</label>
+        <input type="text" id="f_name" placeholder="Your full name">
+      </div>
+
+      <div class="field">
+        <label for="f_email">Email</label>
+        <input type="email" id="f_email" placeholder="username@gmail.com">
+      </div>
+
+      <div class="field">
+        <label for="f_password">Password</label>
+        <input type="password" id="f_password" placeholder="••••••••">
+        <button type="button" class="toggle-visibility" id="toggleBtn">
+          <img src="octicon_eye-closed-24.svg" alt="Show password" id="toggleIcon">
+        </button>
+      </div>
+
+      <div class="field">
+        <label for="f_role">Role</label>
+        <select id="f_role">
+          <option value="" disabled selected>select a role</option>
+          <option value="staff">Staff</option>
+          <option value="accountant">Accountant</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="f_branch">Branches</label>
+        <select id="f_branch">
+          <option value="" disabled selected>select a branch</option>
+          <option value="1">Branch A</option>
+          <option value="2">Branch B</option>
+        </select>
+      </div>
+
+      <button class="primary" id="submitBtn" onclick="submitRequest()">Create an account</button>
+      <div id="message"></div>
+
+      <div class="bottom-link">Already have an account? <a href="/login.html">Log in</a></div>
+    </div>
+  </div>
+
+<script>
+    const toggleBtn = document.getElementById('toggleBtn');
+  const toggleIcon = document.getElementById('toggleIcon');
+  const passwordInput = document.getElementById('f_password');
+  toggleBtn.addEventListener('click', () => {
+    const isHidden = passwordInput.type === 'password';
+    passwordInput.type = isHidden ? 'text' : 'password';
+    toggleIcon.src = isHidden ? 'eye.svg' : 'octicon_eye-closed-24.svg';
+  });
+
+  async function submitRequest() {
+    const messageEl = document.getElementById('message');
+    const btn = document.getElementById('submitBtn');
+    messageEl.textContent = '';
+    messageEl.className = '';
+
+    const body = {
+      name: document.getElementById('f_name').value,
+      email: document.getElementById('f_email').value,
+      password: document.getElementById('f_password').value,
+      role: document.getElementById('f_role').value,
+      branch_id: Number(document.getElementById('f_branch').value)
+    };
+
+    if (!body.name || !body.email || !body.password || !body.role || !body.branch_id) {
+      messageEl.textContent = 'Fill in every field before submitting.';
+      messageEl.className = 'error';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+
+    try {
+      const res = await fetch('/signup-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+
+      messageEl.textContent = 'Request submitted. An accountant will review it before you can log in.';
+      messageEl.className = 'success';
+      document.getElementById('f_name').value = '';
+      document.getElementById('f_email').value = '';
+      document.getElementById('f_password').value = '';
+      document.getElementById('f_role').value = '';
+      document.getElementById('f_branch').value = '';
+    } catch (e) {
+      messageEl.textContent = e.message;
+      messageEl.className = 'error';
+      btn.disabled = false;
+      btn.textContent = 'Create an account';
+    }
+  }
+</script>
+</body>
+</html>
