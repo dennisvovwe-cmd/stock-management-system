@@ -21,26 +21,7 @@
     background: var(--bg);
     color: #1f2547;
   }
-  header {
-    background: #fff;
-    border-bottom: 1px solid var(--border);
-    padding: 14px 24px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  header img { height: 36px; }
-  .user-box { display: flex; align-items: center; gap: 14px; font-size: 14px; }
-  a.back-link { color: var(--blue); text-decoration: none; font-size: 14px; }
-  button.logout {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 7px 14px;
-    cursor: pointer;
-  }
+
   main { max-width: 1000px; margin: 24px auto; padding: 0 20px 60px; }
 
   .toolbar {
@@ -130,32 +111,62 @@
   .modal-actions .cancel { background: var(--bg); color: #1f2547; }
   .modal-actions .save { background: var(--blue); color: #fff; font-weight: 600; }
   #formMessage { font-size: 13px; color: var(--red); margin-bottom: 10px; min-height: 16px; }
+    .modal.wide { max-width: 640px; }
+  .import-help { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 14px; }
+  .import-help p { margin: 0 0 6px 0; }
+  button.link-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    color: var(--blue);
+    font-size: 13px;
+    margin-top: 4px;
+  }
+  .import-summary { font-size: 14px; margin: 4px 0 10px 0; }
+  .problem-list {
+    max-height: 180px;
+    overflow-y: auto;
+    font-size: 13px;
+    background: #fff4e5;
+    color: #8a5a0b;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+    line-height: 1.6;
+  }
+  .import-done {
+    background: #eafaf1;
+    color: #1a9d5a;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    margin-bottom: 14px;
+  }
 </style>
+<link rel="icon" type="image/png" href="/E.png">
+<link rel="stylesheet" href="side-bar.css">
 </head>
 <body>
+<div class="shell">
+  <nav id="sidebarRoot" class="sidebar"></nav>
+  <div class="main-col">
+    <div id="topbarRoot" class="topbar"></div>
+    <main class="page-content">
 
-<header>
-  <img src="ChatGPT Image Sep 22, 2026, 10_04_10 PM 1.svg" alt="Ejisco">
-  <div class="user-box">
-    <a href="/dashboard.html" class="back-link">← Dashboard</a>
-    <span id="userName"></span>
-    <button class="logout" onclick="logout()">Log out</button>
-  </div>
-</header>
-
-<main>
   <div class="toolbar">
     <h2>Products</h2>
     <div style="display:flex; gap:10px; flex-wrap: wrap;">
       <input type="text" class="search" id="searchBox" placeholder="Search products..." oninput="renderTable()">
       <button class="primary" id="addBtn" style="display:none;" onclick="openAddModal()">+ Add Product</button>
+      <button class="primary" id="importOpenBtn" style="display:none;" onclick="openImport()">Import CSV</button>
     </div>
   </div>
 
   <div class="panel">
     <div id="tableContainer" class="empty">Loading...</div>
   </div>
-</main>
 
 <div class="overlay" id="overlay">
   <div class="modal">
@@ -195,18 +206,36 @@
     </div>
   </div>
 </div>
+<div class="overlay" id="importOverlay">
+  <div class="modal wide">
+    <h3>Import products from CSV</h3>
+    <div class="import-help">
+      <p>1. Download the template and fill it in with Excel or Google Sheets, one product per row. Delete the two example rows.</p>
+      <p>2. Save the file as <strong>CSV</strong>, then choose it below.</p>
+      <p id="importCols"></p>
+      <button type="button" class="link-btn" onclick="downloadTemplate()">Download template</button>
+    </div>
+    <input type="file" id="importFile" accept=".csv,text/csv" onchange="handleImportFile(this)">
+    <div id="importPreview"></div>
+    <div class="modal-actions">
+      <button class="cancel" onclick="closeImport()">Close</button>
+      <button class="save" id="importBtn" onclick="runImport()" disabled>Import</button>
+    </div>
+  </div>
+</div>
+    </main>
+  </div>
+</div>
+  </main>
+  </div>
+</div>
 
+<script src="side-bar.js"></script>
+<script src="branch-dropdown.js"></script>
 <script>
   const token = localStorage.getItem('token');
   const role = localStorage.getItem('role');
-  if (!token) window.location.href = '/login.html';
-  document.getElementById('userName').textContent = localStorage.getItem('name') || '';
-
-  function logout() {
-    localStorage.clear();
-    window.location.href = '/login.html';
-  }
-
+   initLayout('PRODUCTS');
   async function api(path, options = {}) {
     const res = await fetch(path, {
       ...options,
@@ -223,7 +252,7 @@
 
   let products = [];
   let editingId = null;
-  const isAccountant = role === 'accountant';
+   const isAccountant = role === 'accountant' || role === 'admin';
 
   function fmt(n) {
     return Number(n).toLocaleString();
@@ -250,13 +279,13 @@
       return;
     }
 
-    const priceHeaders = isAccountant ? '<th>Cost</th><th>Selling</th>' : '';
+    const priceHeaders = isAccountant ? '<th>Cost</th><th>Selling</th>' : '<th>Selling price</th>';
     const actionsHeader = isAccountant ? '<th></th>' : '';
 
     const rows = filtered.map(p => {
-      const priceCells = isAccountant
+            const priceCells = isAccountant
         ? `<td>${p.cost_price != null ? fmt(p.cost_price) : '-'}</td><td>${p.selling_price != null ? fmt(p.selling_price) : '-'}</td>`
-        : '';
+        : `<td>${p.selling_price != null ? fmt(p.selling_price) : '-'}</td>`;
       const actionCells = isAccountant
         ? `<td class="actions">
              <button class="edit" onclick="openEditModal(${p.id})">Edit</button>
@@ -264,10 +293,10 @@
            </td>`
         : '';
       return `<tr>
-        <td>${p.name}</td>
-        <td>${p.category || '-'}</td>
-        <td>${p.unit_type || '-'}</td>
-        <td>${p.description || '-'}</td>
+        <td>${escHtml(p.name)}</td>
+        <td>${escHtml(p.category || '-')}</td>
+        <td>${escHtml(p.unit_type || '-')}</td>
+        <td>${escHtml(p.description || '-')}</td>
         ${priceCells}
         ${actionCells}
       </tr>`;
@@ -371,8 +400,226 @@
 
   if (isAccountant) {
     document.getElementById('addBtn').style.display = 'inline-block';
+    document.getElementById('importOpenBtn').style.display = 'inline-block';
   }
 
+  /* ---------- CSV import ---------- */
+  const HEADER_ALIASES = {
+    name: 'name', product_name: 'name', product: 'name',
+    category: 'category',
+    unit_type: 'unit_type', unit: 'unit_type',
+    description: 'description',
+    cost_price: 'cost_price', cost: 'cost_price',
+    selling_price: 'selling_price', selling: 'selling_price', price: 'selling_price'
+  };
+  let importReady = [];
+
+  function escHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  // Reads CSV text, including quoted values, commas inside quotes, and Excel's semicolon style
+  function parseCSV(text) {
+    text = text.replace(/^\uFEFF/, '');
+    const firstLine = text.split(/\r?\n/)[0] || '';
+    const delim = firstLine.split(';').length > firstLine.split(',').length ? ';' : ',';
+    const rows = [];
+    let row = [], field = '', inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { field += '"'; i++; }
+          else inQuotes = false;
+        } else field += c;
+      } else if (c === '"') inQuotes = true;
+      else if (c === delim) { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else if (c !== '\r') field += c;
+    }
+    if (field !== '' || row.length) { row.push(field); rows.push(row); }
+    return rows.filter(r => r.some(cell => cell.trim() !== ''));
+  }
+
+  // "₦1,500" -> 1500. Blank -> 0. Text -> error.
+  function cleanNumber(raw) {
+    const s = String(raw ?? '').trim();
+    if (s === '') return { value: 0 };
+    const cleaned = s.replace(/[^\d.\-]/g, '');
+    const n = Number(cleaned);
+    if (cleaned === '' || !Number.isFinite(n)) return { error: true };
+    return { value: n };
+  }
+
+async function openImport() {
+  await loadBranches();
+    document.getElementById('importCols').textContent =
+      'Opening stock columns: ' + BRANCHES.map(b => `stock_branch_${b.value} = ${b.name}`).join(', ') + '. Leave them blank for 0.';
+    document.getElementById('importFile').value = '';
+    document.getElementById('importPreview').innerHTML = '';
+    document.getElementById('importBtn').disabled = true;
+    document.getElementById('importBtn').textContent = 'Import';
+    importReady = [];
+    document.getElementById('importOverlay').classList.add('open');
+  }
+
+  function closeImport() {
+    document.getElementById('importOverlay').classList.remove('open');
+  }
+
+  function downloadTemplate() {
+    const branchCols = BRANCHES.map(b => 'stock_branch_' + b.value);
+    const header = ['name', 'category', 'unit_type', 'description', 'cost_price', 'selling_price', ...branchCols];
+    const ex1 = ['Example Socket 13A', 'Electrical', 'piece', 'Single socket', '1200', '1800', ...BRANCHES.map(() => '20')];
+    const ex2 = ['Example Cable 4mm', 'Electrical', 'meter', 'Copper wire', '250', '350', ...BRANCHES.map(() => '100')];
+    const csv = [header, ex1, ex2].map(r => r.join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'products-template.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function handleImportFile(input) {
+    const preview = document.getElementById('importPreview');
+    const btn = document.getElementById('importBtn');
+    importReady = [];
+    btn.disabled = true;
+    btn.textContent = 'Import';
+
+    const file = input.files[0];
+    if (!file) { preview.innerHTML = ''; return; }
+
+    let rows;
+    try {
+      rows = parseCSV(await file.text());
+    } catch (e) {
+      preview.innerHTML = '<div class="problem-list">Could not read that file.</div>';
+      return;
+    }
+    if (rows.length < 2) {
+      preview.innerHTML = '<div class="problem-list">The file has no product rows.</div>';
+      return;
+    }
+    if (rows.length - 1 > 2000) {
+      preview.innerHTML = '<div class="problem-list">The file has more than 2000 rows. Split it into smaller files.</div>';
+      return;
+    }
+
+    // Work out which column is which
+    const headers = rows[0].map(h => h.trim().toLowerCase().replace(/[\s-]+/g, '_'));
+    const colIndex = {};
+    const branchCols = {};
+    const ignored = [];
+    headers.forEach((h, i) => {
+      if (HEADER_ALIASES[h] && colIndex[HEADER_ALIASES[h]] === undefined) colIndex[HEADER_ALIASES[h]] = i;
+      else if (/^stock_branch_\d+$/.test(h)) branchCols[h.replace('stock_branch_', '')] = i;
+      else if (h) ignored.push(rows[0][i].trim());
+    });
+    if (colIndex.name === undefined) {
+      preview.innerHTML = '<div class="problem-list">There is no "name" column. Use the template for the right headings.</div>';
+      return;
+    }
+
+    const existingNames = new Set(products.map(p => (p.name || '').trim().toLowerCase()));
+    const seenInFile = new Set();
+    const problems = [];
+    const ready = [];
+
+    rows.slice(1).forEach((cells, idx) => {
+      const rowNum = idx + 2;
+      const get = (field) => colIndex[field] === undefined ? '' : (cells[colIndex[field]] ?? '').trim();
+
+      const name = get('name');
+      const category = get('category');
+      const unit_type = get('unit_type');
+      const description = get('description');
+      const cost = cleanNumber(get('cost_price'));
+      const selling = cleanNumber(get('selling_price'));
+
+      const fail = (reason) => problems.push({ row: rowNum, name, reason });
+
+      if (!name) return fail('Missing product name');
+      if (name.length > 150) return fail('Name is longer than 150 characters');
+      if (category.length > 100) return fail('Category is longer than 100 characters');
+      if (unit_type.length > 50) return fail('Unit is longer than 50 characters');
+      if (cost.error || cost.value < 0) return fail('Cost price is not a valid number');
+      if (selling.error || selling.value < 0) return fail('Selling price is not a valid number');
+
+      const key = name.toLowerCase();
+      if (existingNames.has(key)) return fail('Already exists, skipped');
+      if (seenInFile.has(key)) return fail('Appears twice in the file, skipped');
+
+      const opening = {};
+      for (const [bid, col] of Object.entries(branchCols)) {
+        const q = cleanNumber(cells[col]);
+        if (q.error || q.value < 0) return fail(`Stock for branch ${bid} is not a valid number`);
+        opening[bid] = q.value;
+      }
+
+      seenInFile.add(key);
+      ready.push({
+        row: rowNum, name, category, unit_type, description,
+        cost_price: cost.value, selling_price: selling.value, opening_stock: opening
+      });
+    });
+
+    importReady = ready;
+
+    let html = `<div class="import-summary"><strong>${ready.length}</strong> ready to import &middot; <strong>${problems.length}</strong> skipped</div>`;
+    if (ignored.length) {
+      html += `<div class="import-help">Ignored columns: ${escHtml(ignored.join(', '))}</div>`;
+    }
+    if (problems.length) {
+      const shown = problems.slice(0, 30)
+        .map(p => `Row ${p.row}${p.name ? ' (' + escHtml(p.name) + ')' : ''}: ${escHtml(p.reason)}`)
+        .join('<br>');
+      html += `<div class="problem-list">${shown}${problems.length > 30 ? `<br>...and ${problems.length - 30} more` : ''}</div>`;
+    }
+    preview.innerHTML = html;
+
+    if (ready.length > 0) {
+      btn.disabled = false;
+      btn.textContent = `Import ${ready.length} product${ready.length === 1 ? '' : 's'}`;
+    }
+  }
+
+  async function runImport() {
+    const btn = document.getElementById('importBtn');
+    const preview = document.getElementById('importPreview');
+    const count = importReady.length;
+    btn.disabled = true;
+    btn.textContent = 'Importing...';
+
+    try {
+      const result = await api('/products/import', {
+        method: 'POST',
+        body: JSON.stringify({ rows: importReady })
+      });
+      let html = `<div class="import-done">Imported ${result.imported} product${result.imported === 1 ? '' : 's'}.</div>`;
+      if (result.skipped.length) {
+        html += `<div class="problem-list">The server skipped:<br>${result.skipped
+          .map(s => `Row ${s.row}${s.name ? ' (' + escHtml(s.name) + ')' : ''}: ${escHtml(s.reason)}`)
+          .join('<br>')}</div>`;
+      }
+      preview.innerHTML = html;
+      document.getElementById('importFile').value = '';
+      importReady = [];
+      btn.textContent = 'Import';
+      await loadProducts();
+    } catch (e) {
+      preview.innerHTML = `<div class="problem-list">${escHtml(e.message)}</div>`;
+      btn.disabled = false;
+      btn.textContent = `Import ${count} product${count === 1 ? '' : 's'}`;
+    }
+  }
+  
+  loadBranches();
   loadProducts();
 </script>
 

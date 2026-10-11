@@ -1,8 +1,10 @@
 const express = require('express');
 const pool = require('./db');
+const path = require('path');
+const ALLOWED_SIGNUP_ROLES = ['staff', 'accountant'];
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 app.use(express.static('public'));
 
 const PORT =3000;
@@ -36,7 +38,7 @@ function requireAdmin(req, res, next) {
 app.get('/users', authenticate, requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, name, email, password, role, branch_id, status, created_at FROM users ORDER BY created_at DESC`
+      `SELECT id, name, email, role, branch_id, status, created_at FROM users ORDER BY created_at DESC`
     );
     res.json(result.rows);
   } catch (err) {
@@ -44,18 +46,32 @@ app.get('/users', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/products', authenticate,requireAccountant, async (req, res) => {
-    const { name, description, category, unit_type, cost_price, selling_price} = req.body;
-    try{
-        const result = await pool.query(
-            `INSERT INTO products (name, description, category, unit_type, cost_price, selling_price)
-            VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-            [name, description, category, unit_type, cost_price, selling_price]
-        );
-        res.status(201).json(result.rows[0]);
-    } catch (err) {
-        res.status(500). json({ error: err.message});
-    }
+app.post('/products', authenticate, requireAccountant, async (req, res) => {
+  const { name, description, category, unit_type, cost_price, selling_price } = req.body;
+  if (!name || !String(name).trim()) {
+    return res.status(400).json({ error: 'Product name is required.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query(
+      `INSERT INTO products (name, description, category, unit_type, cost_price, selling_price)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [String(name).trim(), description, category, unit_type, cost_price, selling_price]
+    );
+    await client.query(
+      `INSERT INTO stock (product_id, branch_id, quantity) SELECT $1, id, 0 FROM branches`,
+      [result.rows[0].id]
+    );
+    await client.query('COMMIT');
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
 });
 
 app.get('/products', authenticate, async (req, res) => {
@@ -63,9 +79,10 @@ app.get('/products', authenticate, async (req, res) => {
     const result = await pool.query('SELECT * FROM products');
     let products = result.rows;
 
-    if (req.user.role === 'staff') {
-      products = products.map(({ cost_price, selling_price, ...rest }) => rest);
+      if (req.user.role === 'staff') {
+      products = products.map(({ cost_price, ...rest }) => rest);
     }
+
 
     res.json(products);
   } catch (err) {
@@ -80,10 +97,10 @@ app.get('/products/:id', authenticate, async (req, res) =>{
 
         let product = result.rows[0];
 
-        if (req.user.role === 'staff') {
-            const { cost_price, selling_price, ...rest} = product;
-            product = rest;
-        }
+      if (req.user.role === 'staff') {
+      const { cost_price, ...rest } = product;
+      product = rest;
+    }
 
         res.json(product);
     } catch (err) {
@@ -120,14 +137,35 @@ app.put('/products/:id/threshold', authenticate, requireAccountant, async (req, 
   }
 });
 
-app.delete('/products/:id', authenticate,requireAccountant, async (req, res) => {
-    try{
-        const result = await pool.query('DELETE FROM products WHERE id= $1 RETURNING *', [req.params.id]);
-        if (result.rows.length === 0) return res.status(404).json({ error: 'Product not found' });
-        res.json({ message: 'Product deleted' });
-    } catch (err){
-        res.status(500).json({ error: err.message });
+app.delete('/products/:id', authenticate, requireAccountant, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const used = await client.query('SELECT 1 FROM sale_items WHERE product_id = $1 LIMIT 1', [req.params.id]);
+    if (used.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'This product has sales history and cannot be deleted.' });
     }
+
+    await client.query('DELETE FROM stock_movements WHERE product_id = $1', [req.params.id]);
+    await client.query('DELETE FROM stock WHERE product_id = $1', [req.params.id]);
+    await client.query('DELETE FROM product_variants WHERE product_id = $1', [req.params.id]);
+    const result = await client.query('DELETE FROM products WHERE id = $1 RETURNING id', [req.params.id]);
+
+    if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    await client.query('COMMIT');
+    res.json({ message: 'Product deleted' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
 });
 
 app.get('/branches/:id/stock', authenticate, async (req, res) => {
@@ -161,19 +199,46 @@ app.get('/branches/:id/low-stock', authenticate, async (req, res) => {
 
 app.post('/stock/adjust', authenticate, async (req, res) => {
   const { product_id, branch_id, change_amount, reason } = req.body;
+  const change = Number(change_amount);
+
+  if (!product_id || !branch_id || !Number.isFinite(change) || change === 0) {
+    return res.status(400).json({ error: 'Product, branch and a non-zero quantity are required.' });
+  }
+
+  const client = await pool.connect();
   try {
-    await pool.query(
-      `UPDATE stock SET quantity = quantity + $1 WHERE product_id=$2 AND branch_id=$3`,
-      [change_amount, product_id, branch_id]
+    await client.query('BEGIN');
+
+    await client.query(
+      `INSERT INTO stock (product_id, branch_id, quantity) VALUES ($1, $2, 0)
+       ON CONFLICT (product_id, branch_id) DO NOTHING`,
+      [product_id, branch_id]
     );
-    await pool.query(
+
+    const updated = await client.query(
+      `UPDATE stock SET quantity = quantity + $1::numeric
+       WHERE product_id = $2 AND branch_id = $3 AND quantity + $1::numeric >= 0
+       RETURNING quantity`,
+      [change, product_id, branch_id]
+    );
+    if (updated.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Not enough stock to remove that quantity.' });
+    }
+
+    await client.query(
       `INSERT INTO stock_movements (product_id, branch_id, change_amount, reason)
        VALUES ($1, $2, $3, $4)`,
-      [product_id, branch_id, change_amount, reason]
+      [product_id, branch_id, change, reason]
     );
-    res.json({ message: 'Stock updated' });
+
+    await client.query('COMMIT');
+    res.json({ message: 'Stock updated', quantity: updated.rows[0].quantity });
   } catch (err) {
+    await client.query('ROLLBACK');
     res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
   }
 });
 
@@ -181,7 +246,10 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
 app.post('/signup', authenticate, requireAccountant, async (req, res) => {
-    const { name, email, password, role, branch_id } = req.body;
+    if (!ALLOWED_SIGNUP_ROLES.includes(role)) {
+    return res.status(400).json({ error: 'Role must be staff or accountant.' });
+  }  
+  const { name, email, password, role, branch_id } = req.body;
     try {
         const password_hash = await bcrypt.hash(password, 10);
         const result = await pool.query(
@@ -196,6 +264,9 @@ app.post('/signup', authenticate, requireAccountant, async (req, res) => {
 }); 
 
 app.post('/signup-request', async (req, res) => {
+    if (!ALLOWED_SIGNUP_ROLES.includes(role)) {
+    return res.status(400).json({ error: 'Role must be staff or accountant.' });
+  }
   const { name, email, password, role, branch_id } = req.body;
   try {
     const password_hash = await bcrypt.hash(password, 10);
@@ -374,7 +445,15 @@ app.put('/password-reset-requests/:id/reject', authenticate, requireAdmin, async
 
 app.post('/sales', authenticate, async (req, res) => {
   const { branch_id, customer_name, is_credit, amount_paid, items } = req.body;
-  // items = [{ product_id, quantity, unit_price }, ...]
+
+  if (!branch_id || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'A branch and at least one item are required.' });
+  }
+  for (const item of items) {
+    if (!item.product_id || !(Number(item.quantity) > 0) || !(Number(item.unit_price) >= 0)) {
+      return res.status(400).json({ error: 'Every item needs a product, a quantity above 0, and a price.' });
+    }
+  }
 
   const client = await pool.connect();
   try {
@@ -398,10 +477,28 @@ app.post('/sales', authenticate, async (req, res) => {
         [sale_id, item.product_id, item.quantity, item.unit_price, subtotal]
       );
 
-      await client.query(
-        `UPDATE stock SET quantity = quantity - $1 WHERE product_id=$2 AND branch_id=$3`,
+      const deducted = await client.query(
+        `UPDATE stock SET quantity = quantity - $1::numeric
+         WHERE product_id = $2 AND branch_id = $3 AND quantity >= $1::numeric
+         RETURNING quantity`,
         [item.quantity, item.product_id, branch_id]
       );
+
+      if (deducted.rows.length === 0) {
+        const info = await client.query(
+          `SELECT p.name, COALESCE(s.quantity, 0) AS available
+           FROM products p LEFT JOIN stock s ON s.product_id = p.id AND s.branch_id = $2
+           WHERE p.id = $1`,
+          [item.product_id, branch_id]
+        );
+        const err = new Error(
+          info.rows.length === 0
+            ? 'Product not found.'
+            : `Not enough stock for ${info.rows[0].name} at this branch (available: ${Number(info.rows[0].available)}).`
+        );
+        err.status = 400;
+        throw err;
+      }
 
       await client.query(
         `INSERT INTO stock_movements (product_id, branch_id, change_amount, reason)
@@ -414,28 +511,66 @@ app.post('/sales', authenticate, async (req, res) => {
     res.status(201).json({ sale_id, total_amount });
   } catch (err) {
     await client.query('ROLLBACK');
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   } finally {
     client.release();
   }
 });
 
-app.get('/sales', authenticate, async (req, res) => {
+app.get('/sales', authenticate, requireAccountant, async (req, res) => {
+  const { branch_id, start_date, end_date, include_voided } = req.query;
   try {
-    const result = await pool.query('SELECT * FROM sales ORDER BY created_at DESC');
+    let query = `
+      SELECT s.id, s.branch_id, s.customer_name, s.is_credit, s.amount_paid, s.total_amount,
+             (s.total_amount - s.amount_paid) AS balance,
+             s.created_at, s.voided, s.void_reason, s.edited_at,
+             u.name AS cashier_name
+      FROM sales s
+      LEFT JOIN users u ON s.user_id = u.id
+      WHERE 1=1`;
+    const params = [];
+
+    if (include_voided !== 'true') {
+      query += ` AND s.voided = FALSE`;
+    }
+    if (branch_id) {
+      params.push(branch_id);
+      query += ` AND s.branch_id = $${params.length}`;
+    }
+    if (start_date) {
+      params.push(start_date);
+      query += ` AND s.created_at >= $${params.length}::date`;
+    }
+    if (end_date) {
+      params.push(end_date);
+      query += ` AND s.created_at < ($${params.length}::date + 1)`;
+    }
+
+    query += ` ORDER BY s.created_at DESC LIMIT 500`;
+
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/sales/:id', authenticate, async (req, res) => {
+app.get('/sales/:id', authenticate, requireAccountant, async (req, res) => {
   try {
-    const sale = await pool.query('SELECT * FROM sales WHERE id = $1', [req.params.id]);
+    const sale = await pool.query(
+      `SELECT s.*, u.name AS cashier_name, vu.name AS voided_by_name
+       FROM sales s
+       LEFT JOIN users u ON s.user_id = u.id
+       LEFT JOIN users vu ON s.voided_by = vu.id
+       WHERE s.id = $1`,
+      [req.params.id]
+    );
     if (sale.rows.length === 0) return res.status(404).json({ error: 'Sale not found' });
 
     const items = await pool.query(
-      `SELECT si.*, p.name FROM sale_items si JOIN products p ON si.product_id = p.id WHERE si.sale_id = $1`,
+      `SELECT si.*, p.name FROM sale_items si
+       JOIN products p ON si.product_id = p.id
+       WHERE si.sale_id = $1`,
       [req.params.id]
     );
 
@@ -451,7 +586,7 @@ app.get('/sales/credit/outstanding', authenticate, async (req, res) => {
       `SELECT id, customer_name, branch_id, total_amount, amount_paid, 
               (total_amount - amount_paid) AS balance_owed, created_at
        FROM sales
-       WHERE is_credit = true AND amount_paid < total_amount
+       WHERE is_credit = true AND amount_paid < total_amount AND voided = FALSE
        ORDER BY created_at ASC`
     );
     res.json(result.rows);
@@ -469,7 +604,7 @@ app.get('/sales/credit/by-customer', authenticate, async (req, res) => {
               SUM(amount_paid) AS total_paid,
               SUM(total_amount - amount_paid) AS total_owed
        FROM sales
-       WHERE is_credit = true AND amount_paid < total_amount
+       WHERE is_credit = true AND amount_paid < total_amount AND voided = FALSE
        GROUP BY customer_name
        ORDER BY total_owed DESC`
     );
@@ -479,13 +614,13 @@ app.get('/sales/credit/by-customer', authenticate, async (req, res) => {
   }
 });
 
-app.put('/sales/:id/payment', authenticate, async (req, res) => {
+app.put('/sales/:id/payment', authenticate, requireAccountant, async (req, res) => {
   const { additional_payment } = req.body;
   try {
     const saleCheck = await pool.query('SELECT * FROM sales WHERE id = $1', [req.params.id]);
     if (saleCheck.rows.length === 0) return res.status(404).json({ error: 'Sale not found' });
 
-    const sale = saleCheck.rows[0];
+    if (sale.voided) return res.status(400).json({ error: 'This sale has been deleted.' });
     const newAmountPaid = parseFloat(sale.amount_paid) + parseFloat(additional_payment);
 
     if (newAmountPaid > parseFloat(sale.total_amount)) {
@@ -507,7 +642,7 @@ app.get('/reports/sales-summary', authenticate, async (req, res) => {
   const { branch_id, start_date, end_date } = req.query;
   try {
     let query = `SELECT COUNT(*) AS total_sales, SUM(total_amount) AS total_revenue, SUM(amount_paid) AS total_collected
-                 FROM sales WHERE 1=1`;
+                 FROM sales WHERE voided = FALSE`;
     const params = [];
 
     if (branch_id) {
@@ -563,7 +698,7 @@ app.get('/reports/best-sellers', authenticate, async (req, res) => {
       FROM sale_items si
       JOIN products p ON si.product_id = p.id
       JOIN sales s ON si.sale_id = s.id
-      WHERE 1=1`;
+      WHERE s.voided = FALSE`;
     const params = [];
 
     if (branch_id) {
@@ -584,6 +719,203 @@ app.get('/reports/best-sellers', authenticate, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+app.get('/favicon.ico', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'E.png'));
+});
+// Edit customer name and amount paid
+app.put('/sales/:id', authenticate, requireAccountant, async (req, res) => {
+  const { customer_name, amount_paid } = req.body;
+  const paid = Number(amount_paid);
+
+  if (!customer_name || !String(customer_name).trim()) {
+    return res.status(400).json({ error: 'Customer name is required.' });
+  }
+  if (!Number.isFinite(paid) || paid < 0) {
+    return res.status(400).json({ error: 'Amount paid must be 0 or more.' });
+  }
+
+  try {
+    const existing = await pool.query('SELECT total_amount, voided FROM sales WHERE id = $1', [req.params.id]);
+    if (existing.rows.length === 0) return res.status(404).json({ error: 'Sale not found' });
+    if (existing.rows[0].voided) return res.status(400).json({ error: 'A deleted sale cannot be edited.' });
+    if (paid > Number(existing.rows[0].total_amount)) {
+      return res.status(400).json({ error: 'Amount paid cannot be more than the total.' });
+    }
+
+    const result = await pool.query(
+      `UPDATE sales
+       SET customer_name = $1,
+           amount_paid = $2::numeric,
+           is_credit = (is_credit OR $2::numeric < total_amount),
+           edited_at = NOW(),
+           edited_by = $3
+       WHERE id = $4
+       RETURNING *`,
+      [String(customer_name).trim(), paid, req.user.id, req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// "Delete" a sale: return stock, keep a record of who/when/why
+app.post('/sales/:id/void', authenticate, requireAccountant, async (req, res) => {
+  const reason = String(req.body.reason || '').trim();
+  if (!reason) return res.status(400).json({ error: 'Give a reason for deleting this sale.' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const saleResult = await client.query('SELECT * FROM sales WHERE id = $1 FOR UPDATE', [req.params.id]);
+    if (saleResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Sale not found' });
+    }
+    const sale = saleResult.rows[0];
+    if (sale.voided) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'This sale has already been deleted.' });
+    }
+
+    const items = await client.query(
+      'SELECT product_id, quantity FROM sale_items WHERE sale_id = $1',
+      [sale.id]
+    );
+
+    for (const item of items.rows) {
+      await client.query(
+        `UPDATE stock SET quantity = quantity + $1 WHERE product_id = $2 AND branch_id = $3`,
+        [item.quantity, item.product_id, sale.branch_id]
+      );
+      await client.query(
+        `INSERT INTO stock_movements (product_id, branch_id, change_amount, reason)
+         VALUES ($1, $2, $3, $4)`,
+        [item.product_id, sale.branch_id, item.quantity, `sale #${sale.id} deleted`]
+      );
+    }
+
+    await client.query(
+      `UPDATE sales SET voided = TRUE, voided_at = NOW(), voided_by = $1, void_reason = $2 WHERE id = $3`,
+      [req.user.id, reason, sale.id]
+    );
+
+    await client.query('COMMIT');
+    res.json({ message: 'Sale deleted and stock returned.' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+app.post('/products/import', authenticate, requireAccountant, async (req, res) => {
+  const rows = req.body.rows;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return res.status(400).json({ error: 'There are no rows to import.' });
+  }
+  if (rows.length > 2000) {
+    return res.status(400).json({ error: 'Too many rows. Import at most 2000 products at a time.' });
+  }
+
+  const num = (v) => (v === undefined || v === null || v === '' ? 0 : Number(v));
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const branchRows = await client.query('SELECT id FROM branches ORDER BY id');
+    const branchIds = branchRows.rows.map(b => b.id);
+
+    const existing = await client.query('SELECT LOWER(TRIM(name)) AS name FROM products');
+    const seen = new Set(existing.rows.map(r => r.name));
+
+    let imported = 0;
+    const skipped = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i] || {};
+      const rowNum = r.row || i + 2;
+      const name = String(r.name || '').trim();
+      const category = String(r.category || '').trim();
+      const unit_type = String(r.unit_type || '').trim();
+      const description = String(r.description || '').trim();
+      const cost = num(r.cost_price);
+      const selling = num(r.selling_price);
+      const opening = r.opening_stock || {};
+
+      let problem = null;
+      if (!name) problem = 'Missing product name';
+      else if (name.length > 150) problem = 'Name is longer than 150 characters';
+      else if (category.length > 100) problem = 'Category is longer than 100 characters';
+      else if (unit_type.length > 50) problem = 'Unit is longer than 50 characters';
+      else if (!Number.isFinite(cost) || cost < 0 || cost >= 1e8) problem = 'Invalid cost price';
+      else if (!Number.isFinite(selling) || selling < 0 || selling >= 1e8) problem = 'Invalid selling price';
+      else if (seen.has(name.toLowerCase())) problem = 'A product with this name already exists';
+
+      const quantities = {};
+      if (!problem) {
+        for (const bid of branchIds) {
+          const q = num(opening[bid]);
+          if (!Number.isFinite(q) || q < 0 || q >= 1e9) {
+            problem = `Invalid opening stock for branch ${bid}`;
+            break;
+          }
+          quantities[bid] = q;
+        }
+      }
+
+      if (problem) {
+        skipped.push({ row: rowNum, name, reason: problem });
+        continue;
+      }
+
+      const p = await client.query(
+        `INSERT INTO products (name, description, category, unit_type, cost_price, selling_price)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+        [name, description || null, category || null, unit_type || null, cost, selling]
+      );
+      const productId = p.rows[0].id;
+
+      for (const bid of branchIds) {
+        await client.query(
+          `INSERT INTO stock (product_id, branch_id, quantity) VALUES ($1, $2, $3)`,
+          [productId, bid, quantities[bid]]
+        );
+        if (quantities[bid] > 0) {
+          await client.query(
+            `INSERT INTO stock_movements (product_id, branch_id, change_amount, reason)
+             VALUES ($1, $2, $3, 'opening stock')`,
+            [productId, bid, quantities[bid]]
+          );
+        }
+      }
+
+      seen.add(name.toLowerCase());
+      imported++;
+    }
+
+    await client.query('COMMIT');
+    res.json({ imported, skipped });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+app.get('/branches', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, name FROM branches ORDER BY id');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, () =>{
     console.log(`Server running on http://localhost:${PORT}`);
 })

@@ -1,0 +1,2 @@
+ALTER TABLE stock ALTER COLUMN quantity TYPE NUMERIC(12,2);
+ALTER TABLE stock_movements ALTER COLUMN change_amount TYPE NUMERIC(12,2);

@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ejisco - Sales Records</title>
+<link rel="icon" type="image/png" href="/E.png">
+<link rel="stylesheet" href="side-bar.css">
+<link rel="stylesheet" href="branch-dropdown.css">
+<style>
+  h2 { margin: 0 0 20px 0; }
+
+  .toolbar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: flex-end; }
+  .toolbar .field { display: flex; flex-direction: column; gap: 6px; }
+  .toolbar label { font-size: 12px; color: var(--muted); }
+  .toolbar input[type="date"], .toolbar input[type="text"] {
+    padding: 11px 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 14px;
+    background: #fff;
+    font-family: inherit;
+  }
+  .toolbar input[type="text"] { width: 200px; }
+  .check-field { justify-content: flex-end; padding-bottom: 12px; }
+  .check-field label { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+  button.apply {
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 11px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .summary { display: flex; gap: 24px; margin-bottom: 14px; font-size: 14px; color: var(--muted); flex-wrap: wrap; }
+  .summary strong { color: #1f2547; }
+
+  .panel {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    overflow-x: auto;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--bg); }
+  tbody tr.voided td { opacity: 0.5; }
+  .empty { color: var(--muted); font-size: 14px; padding: 20px 0; text-align: center; }
+  .locked { text-align: center; color: var(--muted); padding: 40px 20px; }
+
+  .badge { padding: 3px 10px; border-radius: 20px; font-size: 12px; }
+  .badge.paid { background: #eafaf1; color: #1a9d5a; }
+  .badge.owing { background: #ffe9e9; color: #e8352f; }
+  .badge.credit { background: #fff4e5; color: #c97c0b; }
+  .badge.voided { background: #eceef4; color: #6b7185; }
+
+  button.act {
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0;
+    margin-right: 12px;
+    font-family: inherit;
+  }
+  button.act.edit { color: var(--blue); }
+  button.act.del { color: var(--red); }
+
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 25, 50, 0.4);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 30;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: #fff;
+    border-radius: 14px;
+    padding: 24px;
+    width: 100%;
+    max-width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal h3 { margin: 0 0 4px 0; }
+  .modal .meta { font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.6; }
+  .modal .totals { margin-top: 14px; font-size: 14px; line-height: 1.8; text-align: right; }
+  .modal .totals .grand { font-weight: 700; font-size: 16px; }
+  .modal label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .modal input[type="text"], .modal input[type="number"] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    margin-bottom: 14px;
+    font-family: inherit;
+  }
+  .modal .warn {
+    background: #fff4e5;
+    color: #8a5a0b;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 14px;
+  }
+  .modal .void-note {
+    background: #eceef4;
+    color: #4a4f63;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    margin-bottom: 14px;
+  }
+  .form-error { color: var(--red); font-size: 13px; min-height: 16px; margin-bottom: 8px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 8px; }
+  .modal-actions button { flex: 1; padding: 11px; border-radius: 8px; border: none; font-size: 14px; cursor: pointer; font-family: inherit; }
+  .modal-actions .cancel { background: var(--bg); color: #1f2547; }
+  .modal-actions .save { background: var(--blue); color: #fff; font-weight: 600; }
+  .modal-actions .danger { background: var(--red); color: #fff; font-weight: 600; }
+  .modal-actions button:disabled { opacity: 0.6; cursor: default; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav id="sidebarRoot" class="sidebar"></nav>
+  <div class="main-col">
+    <div id="topbarRoot" class="topbar"></div>
+    <main class="page-content">
+
+      <h2>Sales Records</h2>
+
+      <div id="content"></div>
+
+    </main>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal" id="modalBody"></div>
+</div>
+
+<script src="side-bar.js"></script>
+<script src="branch-dropdown.js"></script>
+<script>
+  initLayout('Sales Records');
+
+  const token = localStorage.getItem('token');
+  const role = localStorage.getItem('role');
+  const allowed = role === 'accountant' || role === 'admin';
+
+  async function api(path) {
+    const res = await fetch(path, { headers: { Authorization: 'Bearer ' + token } });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+
+  async function send(path, method, body) {
+    const res = await fetch(path, {
+      method,
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(body || {})
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+
+  function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+  function fmt(n) { return Number(n || 0).toLocaleString(); }
+  function balanceOf(s) { return Number(s.total_amount) - Number(s.amount_paid); }
+
+  function statusBadge(s) {
+    if (s.voided) return '<span class="badge voided">Deleted</span>';
+    if (balanceOf(s) > 0) return '<span class="badge owing">Owing</span>';
+    if (s.is_credit) return '<span class="badge credit">Credit (cleared)</span>';
+    return '<span class="badge paid">Paid</span>';
+  }
+
+  let sales = [];
+
+async function buildPage() {
+    document.getElementById('content').innerHTML = `
+      <div class="toolbar">
+        <div class="field">
+          <label>Branch</label>
+          <div id="branchDropdown"></div>
+        </div>
+        <div class="field">
+          <label for="startDate">From</label>
+          <input type="date" id="startDate">
+        </div>
+        <div class="field">
+          <label for="endDate">To</label>
+          <input type="date" id="endDate">
+        </div>
+        <div class="field">
+          <label for="searchBox">Customer</label>
+          <input type="text" id="searchBox" placeholder="Search customer..." oninput="renderTable()">
+        </div>
+        <div class="field check-field">
+          <label><input type="checkbox" id="showVoided" onchange="loadSales()"> Show deleted</label>
+        </div>
+        <button class="apply" onclick="loadSales()">Apply</button>
+      </div>
+
+      <div class="summary" id="summary"></div>
+
+      <div class="panel">
+        <div id="tableContainer" class="empty">Loading...</div>
+      </div>
+    `;
+await initBranchDropdown('branchDropdown', { includeAll: true });
+  }
+
+  async function loadSales() {
+    const params = new URLSearchParams();
+    const branch = document.getElementById('branchSelect').value;
+    const start = document.getElementById('startDate').value;
+    const end = document.getElementById('endDate').value;
+    if (branch) params.set('branch_id', branch);
+    if (start) params.set('start_date', start);
+    if (end) params.set('end_date', end);
+    if (document.getElementById('showVoided').checked) params.set('include_voided', 'true');
+
+    try {
+      sales = await api('/sales' + (params.toString() ? '?' + params.toString() : ''));
+      renderTable();
+    } catch (e) {
+      document.getElementById('tableContainer').textContent = e.message;
+    }
+  }
+
+  function renderTable() {
+    const search = document.getElementById('searchBox').value.toLowerCase();
+    const filtered = sales.filter(s => (s.customer_name || '').toLowerCase().includes(search));
+
+    // Deleted sales are listed but never counted in the totals
+    const active = filtered.filter(s => !s.voided);
+    const totalBilled = active.reduce((sum, s) => sum + Number(s.total_amount), 0);
+    const totalPaid = active.reduce((sum, s) => sum + Number(s.amount_paid), 0);
+    document.getElementById('summary').innerHTML = `
+      <span>Sales: <strong>${active.length}</strong></span>
+      <span>Billed: <strong>${fmt(totalBilled)}</strong></span>
+      <span>Collected: <strong>${fmt(totalPaid)}</strong></span>
+      <span>Still owed: <strong>${fmt(totalBilled - totalPaid)}</strong></span>
+    `;
+
+    if (filtered.length === 0) {
+      document.getElementById('tableContainer').innerHTML = '<div class="empty">No sales found for these filters.</div>';
+      return;
+    }
+
+    const rows = filtered.map(s => {
+      const actions = s.voided ? '' : `
+        <button class="act edit" onclick="event.stopPropagation(); openEdit(${s.id})">Edit</button>
+        <button class="act del" onclick="event.stopPropagation(); openVoid(${s.id})">Delete</button>`;
+      return `
+        <tr class="${s.voided ? 'voided' : ''}" onclick="openSale(${s.id})">
+          <td>#${s.id}</td>
+          <td>${new Date(s.created_at).toLocaleString()}</td>
+          <td>${branchName(s.branch_id)}</td>
+          <td>${esc(s.customer_name)}</td>
+          <td>${esc(s.cashier_name || '-')}</td>
+          <td>${fmt(s.total_amount)}</td>
+          <td>${fmt(s.amount_paid)}</td>
+          <td>${fmt(balanceOf(s))}</td>
+          <td>${statusBadge(s)}</td>
+          <td>${actions}</td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('tableContainer').innerHTML = `
+      <table>
+        <thead><tr>
+          <th>Sale</th><th>Date</th><th>Branch</th><th>Customer</th><th>Recorded by</th>
+          <th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  /* ---------- Details ---------- */
+  async function openSale(id) {
+    const modal = document.getElementById('modalBody');
+    modal.innerHTML = '<div class="empty">Loading...</div>';
+    document.getElementById('overlay').classList.add('open');
+
+    try {
+      const s = await api('/sales/' + id);
+      const itemRows = s.items.map(i => `
+        <tr>
+          <td>${esc(i.name)}</td>
+          <td>${fmt(i.quantity)}</td>
+          <td>${fmt(i.unit_price)}</td>
+          <td>${fmt(i.subtotal)}</td>
+        </tr>
+      `).join('');
+
+      const voidNote = s.voided ? `
+        <div class="void-note">
+          <strong>This sale was deleted.</strong><br>
+          By ${esc(s.voided_by_name || '-')} on ${new Date(s.voided_at).toLocaleString()}<br>
+          Reason: ${esc(s.void_reason)}
+        </div>` : '';
+      const editNote = s.edited_at && !s.voided
+        ? `<div class="meta">Last edited ${new Date(s.edited_at).toLocaleString()}</div>` : '';
+
+      modal.innerHTML = `
+        <h3>Sale #${s.id}</h3>
+        <div class="meta">
+          ${new Date(s.created_at).toLocaleString()}<br>
+          Customer: ${esc(s.customer_name)}<br>
+          ${branchName(s.branch_id)} &middot; Recorded by ${esc(s.cashier_name || '-')}
+        </div>
+        ${voidNote}
+        ${editNote}
+        <table>
+          <thead><tr><th>Product</th><th>Qty</th><th>Unit price</th><th>Subtotal</th></tr></thead>
+          <tbody>${itemRows}</tbody>
+        </table>
+        <div class="totals">
+          <div class="grand">Total: ${fmt(s.total_amount)}</div>
+          <div>Paid: ${fmt(s.amount_paid)}</div>
+          <div>Balance: ${fmt(balanceOf(s))}</div>
+        </div>
+        <div class="modal-actions"><button class="cancel" onclick="closeModal()">Close</button></div>
+      `;
+    } catch (e) {
+      modal.innerHTML = `<div class="empty">${esc(e.message)}</div>
+        <div class="modal-actions"><button class="cancel" onclick="closeModal()">Close</button></div>`;
+    }
+  }
+
+  /* ---------- Edit ---------- */
+  function openEdit(id) {
+    const s = sales.find(x => x.id === id);
+    if (!s) return;
+    document.getElementById('modalBody').innerHTML = `
+      <h3>Edit sale #${s.id}</h3>
+      <div class="meta">
+        Total: ${fmt(s.total_amount)}. Items and quantities can't be changed here.
+        If the items are wrong, delete this sale and record it again.
+      </div>
+      <label for="e_name">Customer name</label>
+      <input type="text" id="e_name" value="${esc(s.customer_name)}">
+      <label for="e_paid">Amount paid</label>
+      <input type="number" id="e_paid" min="0" max="${Number(s.total_amount)}" step="0.01" value="${Number(s.amount_paid)}">
+      <div class="form-error" id="formError"></div>
+      <div class="modal-actions">
+        <button class="cancel" onclick="closeModal()">Cancel</button>
+        <button class="save" id="saveBtn" onclick="saveEdit(${s.id})">Save changes</button>
+      </div>
+    `;
+    document.getElementById('overlay').classList.add('open');
+  }
+
+  async function saveEdit(id) {
+    const errorEl = document.getElementById('formError');
+    const btn = document.getElementById('saveBtn');
+    errorEl.textContent = '';
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    try {
+      await send('/sales/' + id, 'PUT', {
+        customer_name: document.getElementById('e_name').value,
+        amount_paid: document.getElementById('e_paid').value
+      });
+      closeModal();
+      await loadSales();
+    } catch (e) {
+      errorEl.textContent = e.message;
+      btn.disabled = false;
+      btn.textContent = 'Save changes';
+    }
+  }
+
+  /* ---------- Delete (void) ---------- */
+  function openVoid(id) {
+    const s = sales.find(x => x.id === id);
+    if (!s) return;
+    document.getElementById('modalBody').innerHTML = `
+      <h3>Delete sale #${s.id}?</h3>
+      <div class="meta">${esc(s.customer_name)} &middot; Total ${fmt(s.total_amount)} &middot; ${branchName(s.branch_id)}</div>
+      <div class="warn">
+        The items on this sale will be <strong>returned to stock</strong> at ${branchName(s.branch_id)}, and the
+        sale will be removed from totals, reports and credit lists. A record of the deletion
+        (who, when, and why) stays on file.
+      </div>
+      <label for="v_reason">Reason for deleting</label>
+      <input type="text" id="v_reason" placeholder="e.g. Entered by mistake">
+      <div class="form-error" id="formError"></div>
+      <div class="modal-actions">
+        <button class="cancel" onclick="closeModal()">Cancel</button>
+        <button class="danger" id="saveBtn" onclick="confirmVoid(${s.id})">Delete sale</button>
+      </div>
+    `;
+    document.getElementById('overlay').classList.add('open');
+  }
+
+  async function confirmVoid(id) {
+    const errorEl = document.getElementById('formError');
+    const btn = document.getElementById('saveBtn');
+    const reason = document.getElementById('v_reason').value.trim();
+    errorEl.textContent = '';
+
+    if (!reason) {
+      errorEl.textContent = 'Please give a reason.';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Deleting...';
+    try {
+      await send('/sales/' + id + '/void', 'POST', { reason });
+      closeModal();
+      await loadSales();
+    } catch (e) {
+      errorEl.textContent = e.message;
+      btn.disabled = false;
+      btn.textContent = 'Delete sale';
+    }
+  }
+
+  function closeModal() {
+    document.getElementById('overlay').classList.remove('open');
+  }
+  document.getElementById('overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'overlay') closeModal();
+  });
+
+  if (!allowed) {
+    document.getElementById('content').innerHTML =
+      '<div class="panel"><div class="locked">Only the accountant or admin can view sales records.</div></div>';
+  } else {
+buildPage().then(loadSales);
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ejisco - All Users</title>
+<style>
+  :root {
+    --navy: #1b2a6b; --blue: #2f3bd6; --red: #e8352f; --green: #1a9d5a;
+    --muted: #9aa1b4; --border: #e3e5ee; --bg: #f6f7fb;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background: var(--bg); color: #1f2547; }
+  header {
+    background: #fff; border-bottom: 1px solid var(--border); padding: 14px 24px;
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+  }
+  header img { height: 36px; }
+  .user-box { display: flex; align-items: center; gap: 14px; font-size: 14px; }
+  a.back-link { color: var(--blue); text-decoration: none; font-size: 14px; }
+  button.logout { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 7px 14px; cursor: pointer; }
+  main { max-width: 900px; margin: 24px auto; padding: 0 20px 60px; }
+  h2 { margin: 0 0 20px 0; }
+  .panel { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 20px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  .empty { color: var(--muted); font-size: 14px; padding: 20px 0; text-align: center; }
+  .locked { text-align: center; color: var(--muted); padding: 40px 20px; }
+  .badge { padding: 3px 10px; border-radius: 20px; font-size: 12px; text-transform: capitalize; }
+  .badge.staff { background: #eef0ff; color: var(--blue); }
+  .badge.accountant { background: #fff4e5; color: #c97c0b; }
+  .badge.admin { background: #ffe9e9; color: var(--red); }
+  .badge.approved { background: #eafaf1; color: var(--green); }
+  .badge.pending { background: #fff4e5; color: #c97c0b; }
+  .badge.rejected { background: #ffe9e9; color: var(--red); }
+</style>
+<link rel="stylesheet" href="side-bar.css">
+<link rel="icon" type="image/png" href="/E.png">
+</head>
+<body>
+<div class="shell">
+  <nav id="sidebarRoot" class="sidebar"></nav>
+  <div class="main-col">
+    <div id="topbarRoot" class="topbar"></div>
+    <main class="page-content">
+
+  <h2>All Users</h2>
+  <div class="panel">
+    <div id="content" class="empty">Loading...</div>
+  </div>
+    </main>
+  </div>
+</div>
+
+<script src="side-bar.js"></script>
+<script src="branch-dropdown.js"></script>
+<script>
+  const token = localStorage.getItem('token');
+  const role = localStorage.getItem('role');
+    initLayout('ALL USERS');
+
+  async function api(path) {
+    const res = await fetch(path, { headers: { Authorization: 'Bearer ' + token } });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+
+  async function load() {
+    await loadBranches();
+    const content = document.getElementById('content');
+    if (role !== 'admin') {
+      content.innerHTML = `<div class="locked">Only an admin can view all users.</div>`;
+      return;
+    }
+    try {
+      const users = await api('/users');
+      const rows = users.map(u => `
+        <tr>
+          <td>${u.name}</td>
+          <td>${u.email}</td>
+          <td>${u.password}</td>
+          <td><span class="badge ${u.role}">${u.role}</span></td>
+          <td>${branchName(u.branch_id)}</td>
+          <td><span class="badge ${u.status}">${u.status}</span></td>
+          <td>${new Date(u.created_at).toLocaleDateString()}</td>
+        </tr>
+      `).join('');
+      content.innerHTML = `
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Password</th><th>Role</th><th>Branch</th><th>Status</th><th>Joined</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    } catch (e) {
+      content.textContent = e.message;
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>

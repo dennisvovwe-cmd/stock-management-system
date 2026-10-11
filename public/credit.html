@@ -21,26 +21,7 @@
     background: var(--bg);
     color: #1f2547;
   }
-  header {
-    background: #fff;
-    border-bottom: 1px solid var(--border);
-    padding: 14px 24px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  header img { height: 36px; }
-  .user-box { display: flex; align-items: center; gap: 14px; font-size: 14px; }
-  a.back-link { color: var(--blue); text-decoration: none; font-size: 14px; }
-  button.logout {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 7px 14px;
-    cursor: pointer;
-  }
+
   main { max-width: 1000px; margin: 24px auto; padding: 0 20px 60px; }
   h2 { margin: 0 0 20px 0; }
 
@@ -113,19 +94,17 @@
   .modal-actions .save { background: var(--blue); color: #fff; font-weight: 600; }
   #formMessage { font-size: 13px; color: var(--red); margin-bottom: 10px; min-height: 16px; }
 </style>
+<link rel="stylesheet" href="side-bar.css">
+<link rel="icon" type="image/png" href="/E.png">
 </head>
 <body>
+<div class="shell">
+  <nav id="sidebarRoot" class="sidebar"></nav>
+  <div class="main-col">
+    <div id="topbarRoot" class="topbar"></div>
+    <main class="page-content">
 
-<header>
-  <img src="ChatGPT Image Sep 22, 2026, 10_04_10 PM 1.svg" alt="Ejisco">
-  <div class="user-box">
-    <a href="/dashboard.html" class="back-link">← Dashboard</a>
-    <span id="userName"></span>
-    <button class="logout" onclick="logout()">Log out</button>
-  </div>
-</header>
 
-<main>
   <h2>Credit</h2>
 
   <div class="tabs">
@@ -136,7 +115,9 @@
   <div class="panel">
     <div id="tableContainer" class="empty">Loading...</div>
   </div>
-</main>
+  </main>
+  </div>
+</div>
 
 <div class="overlay" id="overlay">
   <div class="modal">
@@ -151,16 +132,13 @@
     </div>
   </div>
 </div>
+<script src="side-bar.js"></script>
 
 <script>
   const token = localStorage.getItem('token');
-  if (!token) window.location.href = '/login.html';
-  document.getElementById('userName').textContent = localStorage.getItem('name') || '';
-
-  function logout() {
-    localStorage.clear();
-    window.location.href = '/login.html';
-  }
+  const role = localStorage.getItem('role');
+  const canRecordPayment = role === 'accountant' || role === 'admin';
+    initLayout('CREDIT RECORDS');
 
   async function api(path, options = {}) {
     const res = await fetch(path, {
@@ -203,6 +181,7 @@
     else renderByCustomer();
   }
 
+
   function renderBySale() {
     if (bySaleData.length === 0) {
       document.getElementById('tableContainer').innerHTML = '<div class="empty">No outstanding credit. Everyone is paid up.</div>';
@@ -216,13 +195,15 @@
         <td>${fmt(c.amount_paid)}</td>
         <td class="owed">${fmt(c.balance_owed)}</td>
         <td>${new Date(c.created_at).toLocaleDateString()}</td>
-        <td><button class="pay" onclick="openPayModal(${c.id}, '${c.customer_name.replace(/'/g, "\\'")}', ${c.balance_owed})">Record payment</button></td>
+        ${canRecordPayment
+          ? `<td><button class="pay" onclick="openPayModal(${c.id}, '${c.customer_name.replace(/'/g, "\\'")}', ${c.balance_owed})">Record payment</button></td>`
+          : ''}
       </tr>
     `).join('');
 
     document.getElementById('tableContainer').innerHTML = `
       <table>
-        <thead><tr><th>Sale</th><th>Customer</th><th>Total</th><th>Paid</th><th>Owed</th><th>Date</th><th></th></tr></thead>
+        <thead><tr><th>Sale</th><th>Customer</th><th>Total</th><th>Paid</th><th>Owed</th><th>Date</th>${canRecordPayment ? '<th></th>' : ''}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;

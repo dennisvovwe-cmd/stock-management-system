@@ -4,66 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ejisco - Dashboard</title>
+    <link rel="stylesheet" href="side-bar.css">
+    <link rel="stylesheet" href="branch-dropdown.css">
     <style>
-        :root{
-        --navy: #1b2a6b;
-        --blue: #2f3bd6;
-        --red: #e8352f;
-        --muted: #9aa1b4;
-        --border: #e3e5ee;
-        --bg: #f6f7fb;
-        }
-         * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-    background: var(--bg);
-    color: #1f2547;
-  }
-  header {
-    background: #fff;
-    border-bottom: 1px solid var(--border);
-    padding: 14px 24px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  header img { height: 36px; }
-  .user-box { display: flex; align-items: center; gap: 14px; font-size: 14px; }
-  .role-badge {
-    background: #eef0ff;
-    color: var(--blue);
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 12px;
-    text-transform: capitalize;
-  }
-  button.logout {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 7px 14px;
-    cursor: pointer;
-  }
-  main { max-width: 1000px; margin: 24px auto; padding: 0 20px; }
-  .toolbar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 20px;
-  }
-  select {
-    padding: 9px 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 14px;
-    background: #fff;
-  }
-    .cards {
+  .cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
     gap: 16px;
     margin-bottom: 24px;
   }
@@ -106,33 +52,21 @@
   th { color: var(--muted); font-weight: 500; }
   .empty { color: var(--muted); font-size: 14px; }
   .low { color: var(--red); font-weight: 600; }
+  
 </style>
+<link rel="icon" type="image/png" href="/E.png">
 </head>
 <body>
+<div class="shell">
+  <nav id="sidebarRoot" class="sidebar"></nav>
+  <div class="main-col">
+    <div id="topbarRoot" class="topbar"></div>
+    <main class="page-content">
 
-<header>
-  <img src="ChatGPT Image Sep 22, 2026, 10_04_10 PM 1.svg" alt="Ejisco">
-  <div class="user-box">
-    <a href="/stock-adjust.html" style="color: var(--blue); text-decoration: none; font-size: 14px;">Adjust Stock</a>
-    <a href="/products.html" style="color: var(--blue); text-decoration: none; font-size: 14px;">Products</a>
-    <a href="/credit.html" style="color: var(--blue); text-decoration: none; font-size: 14px;">Credit</a>
-        <a href="/reports.html" style="color: var(--blue); text-decoration: none; font-size: 14px;">Reports</a>
-    <a href="/staff.html" style="color: var(--blue); text-decoration: none; font-size: 14px;">Staff</a>
-    <span id="userName"></span>
-    <span class="role-badge" id="userRole"></span>
-    <button class="logout" onclick="logout()">Log out</button>
-  </div>
-</header>
-
-<main>
   <div class="toolbar">
-    <label for="branchSelect">Branch:</label>
-    <select id="branchSelect" onchange="loadAll()">
-      <option value="1">Branch A</option>
-      <option value="2">Branch B</option>
-    </select>
+    <div id="branchDropdown"></div>
   </div>
-
+  <br>
   <div class="cards">
     <div class="card">
       <img src="Top bar icon.svg" alt="" class="Top-bar-icon">
@@ -175,18 +109,11 @@
     <div id="creditTable" class="empty">Loading...</div>
   </section>
 </main>
-
+<script src="side-bar.js"></script>
+<script src="branch-dropdown.js"></script>
 <script>
   const token = localStorage.getItem('token');
-  if (!token) window.location.href = '/login.html';
-
-  document.getElementById('userName').textContent = localStorage.getItem('name') || '';
-  document.getElementById('userRole').textContent = localStorage.getItem('role') || '';
-
-  function logout() {
-    localStorage.clear();
-    window.location.href = '/login.html';
-  }
+    initLayout('Dashboard');
 
   async function api(path) {
     const res = await fetch(path, { headers: { Authorization: 'Bearer ' + token } });
@@ -223,7 +150,7 @@
       const low = await api(`/branches/${branch}/low-stock`);
       document.getElementById('lowStock').innerHTML = table(
         ['Product', 'In stock', 'Reorder at'],
-        low.map(p => [p.name, `<span class="low">${p.quantity}</span>`, p.reorder_threshold])
+               low.map(p => [p.name, `<span class="low">${Number(p.quantity)}</span>`, p.reorder_threshold])
       );
     } catch (e) {
       document.getElementById('lowStock').textContent = e.message;
@@ -233,7 +160,7 @@
       const stock = await api(`/branches/${branch}/stock`);
       document.getElementById('stockTable').innerHTML = table(
         ['Product', 'Quantity'],
-        stock.map(p => [p.name, p.quantity])
+         stock.map(p => [p.name, Number(p.quantity)])
       );
     } catch (e) {
       document.getElementById('stockTable').textContent = e.message;
@@ -251,7 +178,8 @@
     }
   }
 
-  loadAll();
+  
+    initBranchDropdown('branchDropdown', { onChange: loadAll }).then(loadAll);
 </script>
 
 </body>

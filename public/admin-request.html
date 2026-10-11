@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ejisco - Admin Requests</title>
+<style>
+  :root {
+    --navy: #1b2a6b;
+    --blue: #2f3bd6;
+    --red: #e8352f;
+    --green: #1a9d5a;
+    --muted: #9aa1b4;
+    --border: #e3e5ee;
+    --bg: #f6f7fb;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background: var(--bg); color: #1f2547; }
+  main { max-width: 900px; margin: 24px auto; padding: 0 20px 60px; }
+  h2 { margin: 0 0 20px 0; }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab { padding: 9px 16px; border-radius: 20px; background: #fff; border: 1px solid var(--border); cursor: pointer; font-size: 14px; color: var(--muted); }
+  .tab.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+  .panel { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 20px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  .empty { color: var(--muted); font-size: 14px; padding: 20px 0; text-align: center; }
+  .locked { text-align: center; color: var(--muted); padding: 40px 20px; }
+  .actions button { border: none; border-radius: 6px; padding: 6px 12px; font-size: 13px; cursor: pointer; margin-right: 8px; color: #fff; }
+  .actions .approve { background: var(--green); }
+  .actions .reject { background: var(--red); }
+</style>
+<link rel="stylesheet" href="side-bar.css">
+<link rel="icon" type="image/png" href="/E.png">
+</head>
+<body>
+<div class="shell">
+  <nav id="sidebarRoot" class="sidebar"></nav>
+  <div class="main-col">
+    <div id="topbarRoot" class="topbar"></div>
+    <main class="page-content">
+
+  <h2>Pending Requests</h2>
+
+  <div class="tabs">
+    <div class="tab active" id="tabSignup" onclick="showTab('signup')">Sign-up requests</div>
+    <div class="tab" id="tabReset" onclick="showTab('reset')">Password resets</div>
+  </div>
+
+  <div class="panel">
+    <div id="content" class="empty">Loading...</div>
+  </div>
+    </main>
+  </div>
+</div>
+<script src="side-bar.js"></script>
+<script src="branch-dropdown.js"></script>
+<script>
+  const token = localStorage.getItem('token');
+  const role = localStorage.getItem('role');
+  initLayout('ADMIN REQUESTS');
+
+
+  async function api(path, options = {}) {
+    const res = await fetch(path, {
+      ...options,
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, ...(options.headers || {}) }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+
+  let currentTab = 'signup';
+
+  function showTab(tab) {
+    currentTab = tab;
+    document.getElementById('tabSignup').classList.toggle('active', tab === 'signup');
+    document.getElementById('tabReset').classList.toggle('active', tab === 'reset');
+    load();
+  }
+
+    async function load() {
+    await loadBranches();
+    const content = document.getElementById('content');
+    }
+
+  async function load() {
+    const content = document.getElementById('content');
+
+    if (role !== 'admin') {
+      content.innerHTML = `<div class="locked">Only an admin can review these requests.</div>`;
+      return;
+    }
+
+    content.innerHTML = '<div class="empty">Loading...</div>';
+
+    try {
+      if (currentTab === 'signup') {
+        const requests = await api('/signup-requests');
+        if (requests.length === 0) {
+          content.innerHTML = `<div class="empty">No pending sign-up requests.</div>`;
+          return;
+        }
+               const rows = requests.map(r => `
+          <tr>
+            <td>${r.name}</td>
+            <td>${r.email}</td>
+            <td>${r.role}</td>
+            <td>${branchName(r.branch_id)}</td>
+            <td>${new Date(r.created_at).toLocaleDateString()}</td>
+            <td class="actions">
+              <button class="approve" onclick="handleSignup(${r.id}, 'approve')">Approve</button>
+              <button class="reject" onclick="handleSignup(${r.id}, 'reject')">Reject</button>
+            </td>
+          </tr>
+        `).join('');
+        content.innerHTML = `
+          <table>
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Branch</th><th>Requested</th><th></th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        `;
+      }
+    } catch (e) {
+      content.textContent = e.message;
+    }
+  }
+
+  async function handleSignup(id, action) {
+    try {
+      await api(`/signup-requests/${id}/${action}`, { method: 'PUT' });
+      await load();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleReset(id, action) {
+    try {
+      await api(`/password-reset-requests/${id}/${action}`, { method: 'PUT' });
+      await load();
+    } catch (e) { alert(e.message); }
+  }
+
+  load();
+</script>
+</body>
+</html>

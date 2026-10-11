@@ -21,26 +21,7 @@
     background: var(--bg);
     color: #1f2547;
   }
-  header {
-    background: #fff;
-    border-bottom: 1px solid var(--border);
-    padding: 14px 24px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  header img { height: 36px; }
-  .user-box { display: flex; align-items: center; gap: 14px; font-size: 14px; }
-  a.back-link { color: var(--blue); text-decoration: none; font-size: 14px; }
-  button.logout {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 7px 14px;
-    cursor: pointer;
-  }
+  
   main { max-width: 560px; margin: 24px auto; padding: 0 20px 60px; }
   h2 { margin-top: 0; }
 
@@ -85,34 +66,28 @@
     padding: 40px 20px;
   }
 </style>
+<link rel="icon" type="image/png" href="/E.png">
+<link rel="stylesheet" href="side-bar.css">
 </head>
 <body>
-
-<header>
-  <img src="ChatGPT Image Sep 22, 2026, 10_04_10 PM 1.svg" alt="Ejisco">
-  <div class="user-box">
-    <a href="/dashboard.html" class="back-link">← Dashboard</a>
-    <span id="userName"></span>
-    <button class="logout" onclick="logout()">Log out</button>
-  </div>
-</header>
-
-<main>
+<div class="shell">
+  <nav id="sidebarRoot" class="sidebar"></nav>
+  <div class="main-col">
+    <div id="topbarRoot" class="topbar"></div>
+    <main class="page-content">
   <h2>Add Staff</h2>
 
   <div id="content"></div>
 </main>
+</div>
+</div>
 
+<script src="side-bar.js"></script>
+<script src="branch-dropdown.js"></script>
 <script>
   const token = localStorage.getItem('token');
   const role = localStorage.getItem('role');
-  if (!token) window.location.href = '/login.html';
-  document.getElementById('userName').textContent = localStorage.getItem('name') || '';
-
-  function logout() {
-    localStorage.clear();
-    window.location.href = '/login.html';
-  }
+    initLayout('STAFFS');
 
   async function api(path, options = {}) {
     const res = await fetch(path, {
@@ -130,9 +105,13 @@
 
   const content = document.getElementById('content');
 
-  if (role !== 'accountant') {
+  if (role !== 'accountant' && role !== 'admin')  {
     content.innerHTML = `<div class="panel"><div class="locked">Only the accountant can add new staff.</div></div>`;
   } else {
+        loadBranches().then(list => {
+      document.getElementById('f_branch').innerHTML =
+        list.map(b => `<option value="${b.value}">${escBranch(b.name)}</option>`).join('');
+    });
     content.innerHTML = `
       <div class="panel">
         <div class="field">

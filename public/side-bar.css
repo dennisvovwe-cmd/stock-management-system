@@ -1,0 +1,161 @@
+:root {
+  --navy: #1b2a6b;
+  --blue: #2f3bd6;
+  --red: #e8352f;
+  --muted: #9aa1b4;
+  --border: #e3e5ee;
+  --bg: #f6f7fb;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: #1f2547;
+}
+
+.shell { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: 230px;
+  min-width: 230px;
+  background: #fff;
+  border-right: 1px solid var(--border);
+  padding: 18px 14px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
+}
+.sidebar img.logo { height: 52px; margin: 4px 0 20px 10px; }
+
+.nav-section-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  margin: 18px 10px 8px 10px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: #42475a;
+  text-decoration: none;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+.nav-item:hover { background: var(--bg); }
+.nav-item.active { background: var(--blue); color: #fff; }
+.nav-item .icon { width: 18px; text-align: center; }
+
+.main-col {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  background: #ffffff;
+  min-height: 100vh;
+}
+
+/* Faded logo watermark, centered in the content area */
+.main-col::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("E.png") no-repeat;
+  background-size: 540px auto;
+  background-attachment: fixed;
+  background-position: calc(50% + 115px) 50%;
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Keep real content above the watermark */
+.main-col > * { position: relative; z-index: 1; }
+
+.topbar {
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.topbar .page-title { font-size: 15px; color: var(--muted); }
+.topbar .user-box { display: flex; align-items: center; gap: 16px; font-size: 14px; }
+
+.user-identity { display: flex; align-items: center; gap: 10px; }
+.user-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c9a0e8, #8e7bd6);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.user-text { display: flex; flex-direction: column; line-height: 1.3; }
+.user-text .user-name { font-weight: 700; font-size: 14px; color: #1f2547; }
+.user-text .user-role { font-size: 13px; color: var(--muted); text-transform: capitalize; }
+
+.topbar button.logout {
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.topbar button.logout:hover { background: #262fc2; }
+
+main.page-content { max-width: 1000px; margin: 24px auto; padding: 0 20px 60px; }
+
+@media (max-width: 860px) {
+  html, body { overflow-x: hidden; }
+  .shell { flex-direction: column; }
+  .main-col { width: 100%; max-width: 100vw; overflow-x: hidden; }
+
+  /* Navigation becomes one swipeable row of links */
+  .sidebar {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    position: static;
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding: 8px 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    -webkit-overflow-scrolling: touch;
+  }
+  .sidebar img.logo { display: block; height: 24px; margin: 0 8px 0 0; flex-shrink: 0; }
+  .nav-section-label { display: none; }
+  .nav-item { white-space: nowrap; flex-shrink: 0; padding: 8px 12px; font-size: 13px; margin-bottom: 0; }
+
+  /* Top bar: avatar and name on the left, Log Out on the right */
+  .topbar { padding: 10px 14px; flex-wrap: nowrap; }
+  .topbar .page-title { display: none; }
+  .topbar .user-box { width: 100%; justify-content: space-between; gap: 10px; }
+  .user-avatar { width: 36px; height: 36px; font-size: 13px; }
+  .topbar button.logout { padding: 8px 14px; font-size: 13px; }
+
+  main.page-content { padding: 0 14px 40px; margin: 16px auto; }
+
+  /* No watermark on small screens */
+  .main-col::before { display: none; }
+}
