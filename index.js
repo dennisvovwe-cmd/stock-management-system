@@ -150,7 +150,7 @@ app.delete('/products/:id', authenticate, requireAccountant, async (req, res) =>
 
     await client.query('DELETE FROM stock_movements WHERE product_id = $1', [req.params.id]);
     await client.query('DELETE FROM stock WHERE product_id = $1', [req.params.id]);
-    await client.query('DELETE FROM product_variants WHERE product_id = $1', [req.params.id]);
+    await client.query('DELETE FROM product_variant WHERE product_id = $1', [req.params.id]);
     const result = await client.query('DELETE FROM products WHERE id = $1 RETURNING id', [req.params.id]);
 
     if (result.rows.length === 0) {
@@ -916,6 +916,10 @@ app.get('/branches', async (req, res) => {
   }
 });
 
-app.listen(PORT, () =>{
-    console.log(`Server running on http://localhost:${PORT}`);
-})
+const PORT = process.env.PORT || 3000;
+if (require.main === module) {
+  app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+}
+module.exports = app;
+
+
