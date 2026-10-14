@@ -252,8 +252,10 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Request failed');
+      const text = await res.text();
+      let data = {};
+      try { data = JSON.parse(text); } catch (e) {}
+      if (!res.ok) throw new Error(data.error || `Server error (${res.status}). Please try again.`);
 
       messageEl.textContent = 'Request submitted. An accountant will review it before you can log in.';
       messageEl.className = 'success';

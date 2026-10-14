@@ -246,10 +246,10 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 app.post('/signup', authenticate, requireAccountant, async (req, res) => {
-    if (!ALLOWED_SIGNUP_ROLES.includes(role)) {
+  const { name, email, password, role, branch_id } = req.body;  
+  if (!ALLOWED_SIGNUP_ROLES.includes(role)) {
     return res.status(400).json({ error: 'Role must be staff or accountant.' });
   }  
-  const { name, email, password, role, branch_id } = req.body;
     try {
         const password_hash = await bcrypt.hash(password, 10);
         const result = await pool.query(
@@ -264,10 +264,10 @@ app.post('/signup', authenticate, requireAccountant, async (req, res) => {
 }); 
 
 app.post('/signup-request', async (req, res) => {
-    if (!ALLOWED_SIGNUP_ROLES.includes(role)) {
+  const { name, email, password, role, branch_id } = req.body;
+  if (!ALLOWED_SIGNUP_ROLES.includes(role)) {
     return res.status(400).json({ error: 'Role must be staff or accountant.' });
   }
-  const { name, email, password, role, branch_id } = req.body;
   try {
     const password_hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
@@ -911,11 +911,16 @@ app.get('/branches', async (req, res) => {
   try {
     const result = await pool.query('SELECT id, name FROM branches ORDER BY id');
     res.json(result.rows);
-  } catch (err) {
+   } catch (err) {
+    console.error('branches error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: 'Something went wrong on the server.' });
+});
 
 if (require.main === module) {
   app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
