@@ -7,7 +7,7 @@ const app = express();
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static('public'));
 
-const PORT =3000;
+const PORT = process.env.PORT || 3000;
 
 function authenticate(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -916,7 +916,7 @@ app.get('/branches', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
+
 if (require.main === module) {
   app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
 }
