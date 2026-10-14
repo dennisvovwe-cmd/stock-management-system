@@ -242,7 +242,7 @@ app.post('/stock/adjust', authenticate, async (req, res) => {
   }
 });
 
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 app.post('/signup', authenticate, requireAccountant, async (req, res) => {
