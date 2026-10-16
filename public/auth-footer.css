@@ -1,0 +1,127 @@
+:root {
+  --footer-h: 44px;
+  --input-h: clamp(34px, 6vh, 46px);
+}
+
+/* The page never scrolls: it is exactly one screen tall */
+html { height: 100%; overflow: hidden !important; }
+body {
+  height: 100vh !important;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  padding: 0 0 var(--footer-h) 0 !important;
+  overflow: hidden !important;
+}
+
+/* Footer strip */
+.auth-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--footer-h);
+  line-height: var(--footer-h);
+  padding: 0 12px;
+  background: linear-gradient(180deg, #4a7fcb 0%, #5b9bd5 100%);
+  color: #ffffff;
+  font-size: 14px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 50;
+}
+
+/* Two halves fill the space above the footer */
+.brand-side, .form-side {
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+.brand-side img {
+  width: min(500px, 80%) !important;
+  height: auto !important;
+  max-height: 60vh !important;
+  object-fit: contain;
+}
+.form-side {
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 clamp(16px, 4vw, 40px) !important;
+}
+.form-wrap { margin: 0 !important; }
+
+/* Everything inside the form scales with the screen height */
+.wordmark {
+  height: clamp(34px, 8vh, 70px) !important;
+  width: auto !important;
+  max-width: 70% !important;
+  margin-bottom: clamp(6px, 1.6vh, 20px) !important;
+}
+h1 {
+  font-size: clamp(18px, 3.6vh, 28px) !important;
+  margin-bottom: clamp(6px, 1.2vh, 14px) !important;
+}
+.subhead {
+  font-size: clamp(11px, 1.8vh, 13px) !important;
+  margin-bottom: clamp(6px, 1.6vh, 18px) !important;
+}
+label {
+  font-size: clamp(10px, 1.6vh, 12px) !important;
+  margin-bottom: clamp(2px, 0.6vh, 6px) !important;
+}
+.field { margin-bottom: clamp(5px, 1.5vh, 16px) !important; }
+input, select {
+  height: var(--input-h) !important;
+  padding: 0 14px !important;
+  font-size: clamp(12px, 1.9vh, 14px) !important;
+}
+
+/* Show/hide password icon sits level with the input */
+.toggle-visibility {
+  top: auto !important;
+  bottom: 0 !important;
+  right: 12px !important;
+  height: var(--input-h) !important;
+  transform: none !important;
+  padding: 0 4px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+button.primary {
+  height: clamp(36px, 6.4vh, 48px) !important;
+  padding: 0 !important;
+  margin-top: clamp(2px, 0.6vh, 4px) !important;
+}
+button.google {
+  height: clamp(34px, 6vh, 44px) !important;
+  padding: 0 !important;
+}
+.row-links {
+  margin-bottom: clamp(8px, 2vh, 22px) !important;
+  font-size: clamp(11px, 1.7vh, 13px) !important;
+}
+.divider {
+  margin: clamp(6px, 1.6vh, 16px) 0 !important;
+  font-size: 12px !important;
+}
+.bottom-link {
+  margin-top: clamp(2px, 0.6vh, 6px) !important;
+  font-size: clamp(11px, 1.7vh, 13px) !important;
+}
+#message {
+  min-height: 2.6em !important;
+  margin-top: clamp(4px, 1vh, 10px) !important;
+  font-size: 12px !important;
+  line-height: 1.3 !important;
+}
+
+/* Very short windows (such as a phone turned sideways): drop the extras */
+@media (max-height: 560px) {
+  .wordmark, .subhead { display: none !important; }
+}
+
+@media (max-width: 860px) {
+  .auth-footer { font-size: 11px; }
+}
