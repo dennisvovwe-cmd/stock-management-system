@@ -83,12 +83,8 @@
     load();
   }
 
-    async function load() {
-    await loadBranches();
-    const content = document.getElementById('content');
-    }
-
   async function load() {
+    try { await loadBranches(); } catch (e) { /* branch names are optional here */ }
     const content = document.getElementById('content');
 
     if (role !== 'admin') {
@@ -105,12 +101,12 @@
           content.innerHTML = `<div class="empty">No pending sign-up requests.</div>`;
           return;
         }
-               const rows = requests.map(r => `
+        const rows = requests.map(r => `
           <tr>
             <td>${r.name}</td>
             <td>${r.email}</td>
             <td>${r.role}</td>
-            <td>${branchName(r.branch_id)}</td>
+            <td>Branch ${r.branch_id}</td>
             <td>${new Date(r.created_at).toLocaleDateString()}</td>
             <td class="actions">
               <button class="approve" onclick="handleSignup(${r.id}, 'approve')">Approve</button>
@@ -121,6 +117,30 @@
         content.innerHTML = `
           <table>
             <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Branch</th><th>Requested</th><th></th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        `;
+      } else {
+        const requests = await api('/password-reset-requests');
+        if (requests.length === 0) {
+          content.innerHTML = `<div class="empty">No pending password reset requests.</div>`;
+          return;
+        }
+        const rows = requests.map(r => `
+          <tr>
+            <td>${r.name}</td>
+            <td>${r.email}</td>
+            <td>${r.role}</td>
+            <td>${new Date(r.created_at).toLocaleDateString()}</td>
+            <td class="actions">
+              <button class="approve" onclick="handleReset(${r.id}, 'approve')">Approve</button>
+              <button class="reject" onclick="handleReset(${r.id}, 'reject')">Reject</button>
+            </td>
+          </tr>
+        `).join('');
+        content.innerHTML = `
+          <table>
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Requested</th><th></th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
         `;
@@ -145,6 +165,6 @@
   }
 
   load();
-</script>
+</script> 
 </body>
 </html>
