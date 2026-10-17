@@ -68,8 +68,9 @@
   }
 
   async function load() {
-    await loadBranches();
+    try { await loadBranches(); } catch (e) { /* branch names are optional here */ }
     const content = document.getElementById('content');
+    
     if (role !== 'admin') {
       content.innerHTML = `<div class="locked">Only an admin can view all users.</div>`;
       return;
